@@ -1,0 +1,6 @@
+# Development-only tools (not needed to run the app).
+# Install: .venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+# Then once: .venv/Scripts/python.exe -m playwright install chromium
+
+# Headless browser checks for the qa-engineer (tools/qa/qa_browser.py)
+playwright==1.63.0

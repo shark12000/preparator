@@ -7,6 +7,7 @@
       "Bash(.venv/Scripts/python.exe -m compileall:*)",
       "Bash(node --check static/app.js)",
       "Bash(node --check static/editor.js)",
+      "Bash(.venv/Scripts/python.exe -m tools.qa.qa_browser:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",

@@ -29,6 +29,6 @@ node --check static/app.js
 node --check static/editor.js
 .venv/Scripts/python.exe -m unittest discover -s tests
 ```
-You have no browser. Write the manual browser checks (both themes, 390px width, keyboard, console errors) as exact steps under "How to verify"; they are run later by a person or the QA step. Never claim a browser check was done.
+Write the browser checks (both themes, 390px width, keyboard, focus, console errors) as exact, repeatable steps under "How to verify"; the qa-engineer runs them with headless Playwright after you finish. You may run `.venv/Scripts/python.exe -m tools.qa.qa_browser --smoke` yourself as a quick sanity check, but never claim a task-specific browser check was done unless you ran it.
 
 When done: do not move the task file (the orchestrator does that). Fill in its "Implementation notes" (files changed, how to verify, known limitations), set `- Status: review`, and reply with the same summary. Do not commit; the orchestrator commits after review.

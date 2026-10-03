@@ -16,6 +16,8 @@ Local Python interview-practice app. See `README.md` for features and `ARCHITECT
 - Tests: `.venv/Scripts/python.exe -m unittest discover -s tests`
 - Syntax checks: `.venv/Scripts/python.exe -m compileall -q app.py question_bank.py coding_variants.py tests`, `node --check static/app.js`, `node --check static/editor.js`
 - Lint / typecheck: none configured yet.
+- Dev tools (once): `.venv/Scripts/python.exe -m pip install -r requirements-dev.txt` then `.venv/Scripts/python.exe -m playwright install chromium`
+- Browser smoke check (scratch DB, both themes, desktop + 390px): `.venv/Scripts/python.exe -m tools.qa.qa_browser --smoke --out docs/qa/smoke`
 
 # Team workflow (for the main Claude Code session)
 
@@ -33,9 +35,10 @@ This table is the single source of truth for who may write where. Agent files po
 | ideator | `docs/ideas/` |
 | lead-engineer | `ARCHITECTURE.md` (repo root), `README.md`, `docs/architecture/` (api-contract.md, as-built.md, adr/, agent-workflow.md), `docs/tasks/` (new task files), `docs/ideas/` (decision sections only) |
 | designer | `docs/design/` (audit.md, design-system.md, specs, research/), `docs/tasks/` (new frontend task files, and its own task file) |
-| backend-engineer | `app.py`, `question_bank.py`, `coding_variants.py`, `tests/`, `requirements.txt`, its own task file; `docs/architecture/api-contract.md` only to promote the PLANNED entry its task implements |
+| backend-engineer | `app.py`, `question_bank.py`, `coding_variants.py`, `tests/`, `requirements.txt`, `requirements-dev.txt`, its own task file; `docs/architecture/api-contract.md` only to promote the PLANNED entry its task implements |
 | frontend-engineer | `templates/`, `static/` (except `static/vendor/`), its own task file; `docs/design/design-system.md` only the section(s) describing tokens or components its task changed |
 | review-engineer | `docs/reviews/<task-id>.md` only (appends one `## Round N` section per review) |
+| qa-engineer | `docs/qa/<task-id>/` (check scripts, screenshots), `tools/qa/` (shared helpers), the "Manual check results" section and acceptance checkboxes of the task file it was given |
 
 Nobody writes to `instance/` or `static/vendor/`.
 
@@ -51,19 +54,20 @@ Nobody writes to `instance/` or `static/vendor/`.
    like code. [APPROVAL: show the human the frontend tasks the designer wrote before dispatching any of them]
 4. backend-engineer and frontend-engineer implement their tasks. They may run in parallel
    once the API contract exists. Never let both edit the same files (backend: Python + `tests/`; frontend: `templates/` + `static/`).
-5. review-engineer reviews the one task you name (code or design; tell it the round number). It writes its report to `docs/reviews/<task-id>.md` itself.
+5. For frontend tasks (and backend tasks with visible UI effects), qa-engineer first runs the task's browser checks on a scratch database and records results and screenshots in the task file. Then review-engineer reviews the one task you name (code or design; tell it the round number), taking the QA results into account. It writes its report to `docs/reviews/<task-id>.md` itself. A QA FAIL goes back to the author like a review finding.
    - CHANGES REQUESTED: send the task back to its author with the review; repeat step 5.
    - APPROVED: move the task to `done/` and commit.
 6. After a batch is done, ask lead-engineer whether `ARCHITECTURE.md` needs updating. (The API contract is kept current per task: backend promotes its PLANNED entry, and the reviewer flags a stale contract as SHOULD-FIX.)
 
 ## Lanes and dispatching
-- Work runs in three lanes: **backend** (Python files + `tests/`), **frontend** (`templates/` + `static/`) and **design** (`docs/design/` + new task files). Lanes run in parallel; within a lane, run one task at a time, because its tasks share files (`app.py`, `tests/test_app.py`, `static/app.js`, `design-system.md`).
+- Work runs in three lanes (qa-engineer joins the frontend lane: it runs between implementation and review, never at the same time as a frontend implementer): **backend** (Python files + `tests/`), **frontend** (`templates/` + `static/`) and **design** (`docs/design/` + new task files). Lanes run in parallel; within a lane, run one task at a time, because its tasks share files (`app.py`, `tests/test_app.py`, `static/app.js`, `design-system.md`).
 - Do not start the next task in a lane until the current task's review verdict is in: the reviewer reads the same files, and a changes-requested round needs them unchanged. While a task is held (for example approved but waiting for a human check), the lane may continue if the next task does not depend on it.
 - Two design runs may overlap only if you give them disjoint files (name which spec, which task files, and who may touch `design-system.md`) and disjoint ID ranges.
 - In every dispatch prompt, give: the task file path; which recently landed tasks it must keep intact; which files other agents are editing right now (do not touch them); for reviews, the round number; known flaky tests (currently `test_coding_question_includes_a_python_starter`, about 1 run in 27: re-run, do not count it).
 - Pass small review notes forward: NITs from an approved task that touch the files of the next task in the same lane are added to that next dispatch. The implementer lists them in its notes under "Folded-in review NITs". Notes that belong to another owner go to that owner's next task or to the lead.
 - If an agent is cut off (rate limit, error), check what it left on disk before re-dispatching, and tell the new run to continue from that state.
-- Browser and screen-reader checks that no agent ran stay unticked and are marked "PENDING manual check" in the task file. A task may move to `done/` with PENDING checks only if its review approved the code; list it in the next status report. A task whose risk depends on such a check (for example TASK-002) stays in `review/` until the human runs it.
+- Browser checks are run by qa-engineer (headless Playwright). Only what it cannot run (real screen-reader passes, anything needing an external site) stays unticked and marked "PENDING human" in the task file. A task may move to `done/` with PENDING human checks only if its review approved the code; list it in the next status report. A task whose risk depends on such a check stays in `review/` until it is verified.
+- Done tasks from before qa-engineer existed (TASK-001, 009, 013, 014, 020, 025) still carry "PENDING manual check" items: dispatch qa-engineer on them; TASK-002 stays in `review/` until TASK-001's check passes.
 
 ## Rules
 - Move a task file to `in-progress/` before dispatching it.

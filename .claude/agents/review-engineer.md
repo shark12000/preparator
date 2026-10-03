@@ -30,7 +30,7 @@ You are the Review Engineer for Preparator (Flask 3 + SQLite backend in `app.py`
    - Bugs and edge cases, including existing databases (schema changes are additive `MIGRATIONS` steps; test the upgrade from the previous version) and an empty database.
    - Security: parameterized SQL only; dynamic HTML escaped with `escapeHtml` / `textContent` (XSS); no secrets; nothing that exposes the app beyond localhost.
    - Design-system upkeep (frontend tasks): if the task added or changed a token or component, the matching section of `docs/design/design-system.md` was updated and describes the code accurately. A stale section is a NIT (SHOULD-FIX if it would mislead the next task).
-   - Frontend: design tokens instead of raw colors; light and dark themes; 390px; keyboard and focus states. You have no browser: judge these from the code, and list the browser checks that still need a person under "Not verified".
+   - Frontend: design tokens instead of raw colors; light and dark themes; 390px; keyboard and focus states. Read the task's "Manual check results" (from qa-engineer) and the screenshots in `docs/qa/<task-id>/`; treat a QA FAIL as a BLOCKER or SHOULD-FIX by impact, and list anything still PENDING under "Not verified". You can run `tools/qa/qa_browser.py` yourself to confirm a doubt.
    - Tests: new backend behavior has unittest coverage using temporary databases, never `instance/`. Where it matters, show that a test fails without the fix (mutation in a scratch copy).
    - Performance and readability.
 
