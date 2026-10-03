@@ -29,6 +29,7 @@ You are the Review Engineer for Preparator (Flask 3 + SQLite backend in `app.py`
    - Guardrails in `ARCHITECTURE.md` still hold: no solution before submission, the search gate on `POST /api/question`, rubric scoring labeled heuristic, CSV formula neutralization, submitted code never executed.
    - Bugs and edge cases, including existing databases (schema changes are additive `MIGRATIONS` steps; test the upgrade from the previous version) and an empty database.
    - Security: parameterized SQL only; dynamic HTML escaped with `escapeHtml` / `textContent` (XSS); no secrets; nothing that exposes the app beyond localhost.
+   - Design-system upkeep (frontend tasks): if the task added or changed a token or component, the matching section of `docs/design/design-system.md` was updated and describes the code accurately. A stale section is a NIT (SHOULD-FIX if it would mislead the next task).
    - Frontend: design tokens instead of raw colors; light and dark themes; 390px; keyboard and focus states. You have no browser: judge these from the code, and list the browser checks that still need a person under "Not verified".
    - Tests: new backend behavior has unittest coverage using temporary databases, never `instance/`. Where it matters, show that a test fails without the fix (mutation in a scratch copy).
    - Performance and readability.

@@ -6,7 +6,7 @@ Local Python interview-practice app. See `README.md` for features and `ARCHITECT
 - Backend: Python 3.14, Flask 3, SQLite (stdlib `sqlite3`) in `app.py`, `question_bank.py`, `coding_variants.py`; tests in `tests/` (unittest).
 - Schema: versioned migrations in `app.py` (`MIGRATIONS`, `PRAGMA user_version`); add a new step for every schema change. Steps are additive only.
 - Frontend: `templates/index.html`, `static/app.js`, `static/editor.js`, `static/style.css` (vanilla JS ES modules, CSS tokens, no build step). `static/vendor/codemirror.js` is a prebuilt bundle; do not hand-edit.
-- API contract: `docs/architecture/api-contract.md` (current endpoints plus PLANNED changes).
+- API contract: `docs/architecture/api-contract.md` (current endpoints plus PLANNED changes). As-built description of the code: `docs/architecture/as-built.md` (the repo-root `ARCHITECTURE.md` is the normative one).
 - Packages: pip + `requirements.txt` in `.venv/`.
 - Version control: git, branch `main`.
 - Real user data: `instance/preparator.sqlite3`. Never use it in tests or experiments; set `PREPARATOR_DATABASE` to a scratch file.
@@ -29,12 +29,12 @@ This table is the single source of truth for who may write where. Agent files po
 
 | Agent | May write to |
 |---|---|
-| orchestrator (main session) | moves task files between `docs/tasks/` folders; `docs/HANDOFF.md`; git commits |
+| orchestrator (main session) | moves task files between `docs/tasks/` folders; `docs/tasks/NEXT_ID`; `docs/HANDOFF.md`; git commits |
 | ideator | `docs/ideas/` |
-| lead-engineer | `ARCHITECTURE.md` (repo root), `docs/architecture/` (api-contract.md, adr/, as-built docs), `docs/tasks/` (new task files), `docs/ideas/` (decision sections only) |
+| lead-engineer | `ARCHITECTURE.md` (repo root), `README.md`, `docs/architecture/` (api-contract.md, as-built.md, adr/, agent-workflow.md), `docs/tasks/` (new task files), `docs/ideas/` (decision sections only) |
 | designer | `docs/design/` (audit.md, design-system.md, specs, research/), `docs/tasks/` (new frontend task files, and its own task file) |
 | backend-engineer | `app.py`, `question_bank.py`, `coding_variants.py`, `tests/`, `requirements.txt`, its own task file; `docs/architecture/api-contract.md` only to promote the PLANNED entry its task implements |
-| frontend-engineer | `templates/`, `static/` (except `static/vendor/`), its own task file |
+| frontend-engineer | `templates/`, `static/` (except `static/vendor/`), its own task file; `docs/design/design-system.md` only the section(s) describing tokens or components its task changed |
 | review-engineer | `docs/reviews/<task-id>.md` only (appends one `## Round N` section per review) |
 
 Nobody writes to `instance/` or `static/vendor/`.
@@ -59,6 +59,7 @@ Nobody writes to `instance/` or `static/vendor/`.
 ## Rules
 - Move a task file to `in-progress/` before dispatching it.
 - Give each subagent the task file path, not a paraphrase.
+- Task IDs: `docs/tasks/NEXT_ID` holds the next free ID and only you update it. Before dispatching an agent that may create tasks (lead-engineer, designer), reserve a range (e.g. TASK-044 to TASK-050), tell the agent that range, and advance `NEXT_ID` past it.
 - Max 3 review rounds per task, for code and design tasks alike; then escalate to the human.
 - Commit after each approved task (one commit per task, message "TASK-NNN: <title>"), so reviewers can use `git diff`. Task "Implementation notes" still list every changed file.
 - The guardrails in `ARCHITECTURE.md` ("Agent Guardrails") apply to every agent; changing one needs human approval and an ADR.
