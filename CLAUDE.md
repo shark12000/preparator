@@ -48,5 +48,5 @@ Agents and what they may edit:
 - Move a task file to `in-progress/` before dispatching it.
 - Give each subagent the task file path, not a paraphrase.
 - Max 3 review rounds per task; then escalate to the human.
-- Commit after each approved task. The project is not a git repo yet: until the human runs `git init`, skip commits and make sure the task's "Implementation notes" list every changed file, because the reviewer has no diff.
+- Commit after each approved task (one commit per task, message "TASK-NNN: <title>"), so reviewers can use `git diff`. Task "Implementation notes" still list every changed file.
 - The guardrails in `ARCHITECTURE.md` ("Agent Guardrails") apply to every agent; changing one needs human approval and an ADR.

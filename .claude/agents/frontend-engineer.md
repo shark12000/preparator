@@ -30,4 +30,4 @@ node --check static/editor.js
 ```
 Then verify by hand: `.venv/Scripts/python.exe app.py`, open http://127.0.0.1:5000 (use `PREPARATOR_DATABASE` pointing at a scratch file), and check the changed views in both themes and at phone width (390px). Confirm the browser console has no errors.
 
-When done: move the task file to `docs/tasks/review/`, fill in its "Implementation notes" (files changed: the project is not a git repo, so list every file, plus how to verify and known limitations) and reply with the same summary.
+When done: move the task file to `docs/tasks/review/`, fill in its "Implementation notes" (files changed, how to verify and known limitations) and reply with the same summary.

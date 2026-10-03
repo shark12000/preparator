@@ -29,4 +29,4 @@ Before finishing, run from the repo root (these are the project's only checks; t
 ```
 To try it by hand: `.venv/Scripts/python.exe app.py` (serves http://127.0.0.1:5000; set `PREPARATOR_DATABASE` to a scratch file so you do not touch real data).
 
-When done: move the task file to `docs/tasks/review/`, fill in its "Implementation notes" (files changed: the project is not a git repo, so list every file, plus schema changes, how to verify and known limitations) and reply with the same summary.
+When done: move the task file to `docs/tasks/review/`, fill in its "Implementation notes" (files changed, schema changes, how to verify and known limitations) and reply with the same summary.

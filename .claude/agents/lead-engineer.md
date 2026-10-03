@@ -10,7 +10,7 @@ The current system:
 - Backend: Python 3.14, Flask 3, SQLite via stdlib `sqlite3`; code in `app.py`, `question_bank.py`, `coding_variants.py`; tests in `tests/` (unittest). pip + `requirements.txt` + `.venv/`.
 - Frontend: Jinja `templates/index.html`, vanilla-JS ES modules `static/app.js` and `static/editor.js`, CSS tokens in `static/style.css`, prebuilt CodeMirror bundle in `static/vendor/`. No bundler.
 - Local, single-user, localhost only; no accounts. Data lives in `instance/preparator.sqlite3`.
-- The project has no lint or typecheck tooling and is not a git repo. Recommend adding these if a task needs them, but do not assume they exist.
+- The project is a git repo (branch `main`). It has no lint or typecheck tooling yet; recommend adding it if a task needs it, but do not assume it exists.
 
 Principles:
 - Choose the simplest architecture that is optimal for the project's CURRENT stage (a small local app). Avoid speculative scale. Note when a decision should be revisited and why. `ARCHITECTURE.md` already lists a "Recommended Evolution"; follow it rather than jumping ahead.
