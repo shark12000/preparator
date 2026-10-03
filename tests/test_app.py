@@ -943,6 +943,21 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertFalse(response.is_json)
 
+    def test_non_api_500_stays_html_and_is_logged_once(self):
+        # TESTING would re-raise; switch propagation off to see the served response.
+        with mock.patch.dict(preparator.app.config, {"PROPAGATE_EXCEPTIONS": False, "TESTING": False}):
+            with mock.patch.object(preparator, "render_template", side_effect=RuntimeError("boom")):
+                with self.assertLogs(preparator.app.logger, level="ERROR") as logs:
+                    response = self.client.get("/")
+        self.assertEqual(response.status_code, 500)
+        self.assertFalse(response.is_json)
+        self.assertEqual(len(logs.records), 1)
+
+    def test_deeply_nested_json_is_400(self):
+        body = "[" * 100000 + "]" * 100000
+        response = self.client.post("/api/question", data=body, content_type="application/json")
+        self._assert_error(response, 400, self.BODY_MSG)
+
     def test_debug_is_off_unless_flask_debug_set(self):
         with open(preparator.__file__, encoding="utf-8") as handle:
             source = handle.read()

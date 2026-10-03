@@ -73,15 +73,18 @@ def handle_error(error):
         if status == 405 and error.get_response().headers.get("Allow"):
             response.headers["Allow"] = error.get_response().headers["Allow"]
         return response
-    app.logger.exception("Unhandled error on %s %s", request.method, request.path)
     if not is_api:
-        raise error
+        raise error  # Flask's own handler logs it and serves the HTML 500
+    app.logger.exception("Unhandled error on %s %s", request.method, request.path)
     return jsonify({"error": "Something went wrong. Try again."}), 500
 
 
 def read_json_object():
     """Return (body, None) for a JSON-object body, else (None, error response)."""
-    data = request.get_json(silent=True)
+    try:
+        data = request.get_json(silent=True)
+    except RecursionError:  # absurdly nested JSON within the size cap
+        data = None
     if not isinstance(data, dict):
         return None, (jsonify({"error": "The request body must be a JSON object."}), 400)
     return data, None
