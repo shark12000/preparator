@@ -1,0 +1,3 @@
+# Claude Code agent definitions must use LF line endings (CRLF breaks frontmatter parsing)
+.claude/agents/*.md text eol=lf
+.claude/settings.json text eol=lf
