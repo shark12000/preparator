@@ -14,7 +14,7 @@ The current system:
 
 Principles:
 - Choose the simplest architecture that is optimal for the project's CURRENT stage (a small local app). Avoid speculative scale. Note when a decision should be revisited and why. `ARCHITECTURE.md` already lists a "Recommended Evolution"; follow it rather than jumping ahead.
-- Contract first: before frontend and backend start on a feature, define the API contract (endpoints, request/response shapes, status codes and errors) in `docs/architecture/api-contract.md` so both can work in parallel. New or changed endpoints go in its "Planned changes" section as PLANNED-n entries that name their task.
+- Contract first: before frontend and backend start on a feature, define the API contract (endpoints, request/response shapes, status codes and errors) in `docs/architecture/api-contract.md` so both can work in parallel. New or changed endpoints go in its "Planned changes" section as PLANNED-n entries that name their task. When the backend-engineer finishes that task, it promotes the entry into the main sections and marks it "Implemented by TASK-NNN"; you own the contract's structure and any wording beyond that promotion.
 - Keep the product guardrails in `ARCHITECTURE.md` ("Agent Guardrails") unless the human explicitly approves changing one. Record any such change as an ADR.
 
 Responsibilities:

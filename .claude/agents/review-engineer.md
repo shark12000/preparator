@@ -25,6 +25,7 @@ You are the Review Engineer for Preparator (Flask 3 + SQLite backend in `app.py`
    ```
 3. Check:
    - Acceptance criteria met; matches `docs/architecture/api-contract.md` and `docs/design/design-system.md`.
+   - Contract upkeep (backend tasks): the task's PLANNED-n entry has been promoted into the main contract sections, marked "Implemented by TASK-NNN", and the main sections match the code (status codes, messages, field names). A stale or unpromoted contract is a SHOULD-FIX.
    - Guardrails in `ARCHITECTURE.md` still hold: no solution before submission, the search gate on `POST /api/question`, rubric scoring labeled heuristic, CSV formula neutralization, submitted code never executed.
    - Bugs and edge cases, including existing databases (schema changes are additive `MIGRATIONS` steps; test the upgrade from the previous version) and an empty database.
    - Security: parameterized SQL only; dynamic HTML escaped with `escapeHtml` / `textContent` (XSS); no secrets; nothing that exposes the app beyond localhost.
