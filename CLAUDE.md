@@ -29,13 +29,13 @@ This table is the single source of truth for who may write where. Agent files po
 
 | Agent | May write to |
 |---|---|
-| orchestrator (main session) | moves task files between `docs/tasks/` folders; `docs/reviews/`; `docs/HANDOFF.md`; git commits |
+| orchestrator (main session) | moves task files between `docs/tasks/` folders; `docs/HANDOFF.md`; git commits |
 | ideator | `docs/ideas/` |
 | lead-engineer | `ARCHITECTURE.md` (repo root), `docs/architecture/` (api-contract.md, adr/, as-built docs), `docs/tasks/` (new task files), `docs/ideas/` (decision sections only) |
 | designer | `docs/design/` (audit.md, design-system.md, specs, research/), `docs/tasks/` (new frontend task files, and its own task file) |
 | backend-engineer | `app.py`, `question_bank.py`, `coding_variants.py`, `tests/`, `requirements.txt`, its own task file |
 | frontend-engineer | `templates/`, `static/` (except `static/vendor/`), its own task file |
-| review-engineer | nothing (reports only; you save its output) |
+| review-engineer | `docs/reviews/<task-id>.md` only (appends one `## Round N` section per review) |
 
 Nobody writes to `instance/` or `static/vendor/`.
 
@@ -51,7 +51,7 @@ Nobody writes to `instance/` or `static/vendor/`.
    like code. [APPROVAL: show the human the frontend tasks the designer wrote before dispatching any of them]
 4. backend-engineer and frontend-engineer implement their tasks. They may run in parallel
    once the API contract exists. Never let both edit the same files (backend: Python + `tests/`; frontend: `templates/` + `static/`).
-5. review-engineer reviews every task that reaches `docs/tasks/review/`: code tasks and design tasks alike. Save its output to `docs/reviews/<task-id>.md`.
+5. review-engineer reviews the one task you name (code or design; tell it the round number). It writes its report to `docs/reviews/<task-id>.md` itself.
    - CHANGES REQUESTED: send the task back to its author with the review; repeat step 5.
    - APPROVED: move the task to `done/` and commit.
 6. After a batch is done, ask lead-engineer whether `ARCHITECTURE.md` needs updating.
