@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preparator | Python interview lab</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c5d97c'/%3E%3Ctext x='16' y='24' font-family='Georgia,serif' font-size='22' text-anchor='middle' fill='%23102b25'%3EP%3C/text%3E%3C/svg%3E">
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    let theme = null;
+    try { theme = localStorage.getItem("preparator-theme"); } catch (_error) {}
+    document.documentElement.dataset.theme = theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></symbol>
+    <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M8 16h8"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-4-3-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-5 5-5 8a7 7 0 0 0 7 7z"/></symbol>
+  </svg>
+
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#practice" aria-label="Preparator home"><span class="brand-mark">P</span><span>preparator<span class="brand-period">.</span></span></a>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="practice" aria-current="page"><svg class="icon"><use href="#i-target"/></svg><span>Practice</span><span class="nav-count" id="attempt-count">0</span></button>
+        <button class="nav-item" data-view="learn"><svg class="icon"><use href="#i-book"/></svg><span>Learn</span></button>
+        <button class="nav-item" data-view="weaknesses"><svg class="icon"><use href="#i-rotate"/></svg><span>Weak spots</span><span class="nav-count" id="weak-count">0</span></button>
+        <button class="nav-item" data-view="progress"><svg class="icon"><use href="#i-chart"/></svg><span>Progress</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <button class="sidebar-tool" id="theme-toggle" type="button"><svg class="icon"><use href="#i-moon"/></svg><span>Dark theme</span></button>
+        <button class="sidebar-tool" id="shortcuts-button" type="button" aria-label="Keyboard shortcuts"><svg class="icon"><use href="#i-keyboard"/></svg><span>Shortcuts</span><kbd>?</kbd></button>
+        <p class="sidebar-note">Progress is saved on this computer.</p>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div class="breadcrumb"><span>Workspace</span><span aria-hidden="true">/</span><b id="crumb-view">Practice</b></div>
+        <div class="topbar-right">
+          <span class="streak-chip" id="streak-chip" title="Consecutive days with at least one answer"><svg class="icon"><use href="#i-flame"/></svg><span id="streak-value">No streak yet</span></span>
+          <span class="today" id="today-label"></span>
+        </div>
+      </header>
+
+      <!-- PRACTICE -->
+      <section class="view active" id="practice-view" aria-labelledby="practice-title">
+        <div class="page-intro compact">
+          <div class="eyebrow"><span class="eyebrow-line"></span>The Python interview lab</div>
+          <h1 id="practice-title">Think clearly. <em>Code confidently.</em></h1>
+        </div>
+
+        <div class="filter-bar" role="group" aria-label="Question filters">
+          <label class="chip-select"><span>Topic</span><select id="topic-select"><option>All topics</option></select></label>
+          <label class="chip-select"><span>Level</span><select id="difficulty-select"><option>Any level</option><option>Foundations</option><option>Intermediate</option><option>Advanced</option></select></label>
+          <label class="chip-select"><span>Format</span><select id="mode-select"><option>Any mode</option><option>Theory</option><option>Coding</option></select></label>
+          <div class="session-meta" aria-live="off"><span id="session-label">No question yet</span><span class="timer hidden" id="question-timer" title="Time on this question">00:00</span></div>
+        </div>
+
+        <div class="practice-layout">
+          <div class="question-column">
+            <section class="card question-card" id="question-panel">
+              <!-- Step 1: search gate -->
+              <div class="state" id="state-intro">
+                <ol class="steps" aria-label="How a question works">
+                  <li class="current" id="step-search"><b>1</b>Search</li>
+                  <li id="step-answer"><b>2</b>Answer</li>
+                  <li id="step-review"><b>3</b>Review</li>
+                </ol>
+                <h2 class="state-title">Check what interviewers are asking.</h2>
+                <p class="state-copy">Before each prompt, open a web search for recent Python interview reports that match your filters. Results are third-party reports, not company-verified records. <span class="muted" id="bank-count"></span></p>
+                <div class="button-row">
+                  <button class="btn btn-primary" id="search-button" type="button"><span>Open interview search</span><svg class="icon"><use href="#i-external"/></svg></button>
+                  <button class="btn btn-secondary hidden" id="reveal-button" type="button"><span>I've reviewed it — show question</span><svg class="icon"><use href="#i-arrow"/></svg></button>
+                </div>
+                <p class="inline-error hidden" id="intro-error" role="alert"></p>
+              </div>
+
+              <div class="state hidden" id="state-loading"><span class="loader" aria-hidden="true"></span><p>Preparing your question…</p></div>
+
+              <!-- Step 2 + 3: question, answer, feedback -->
+              <div class="state hidden" id="state-question">
+                <div class="question-head">
+                  <div class="tags" id="question-tags"></div>
+                  <a class="source-link" id="source-link" href="#" target="_blank" rel="noopener noreferrer"><svg class="icon"><use href="#i-check"/></svg>Search reviewed · results<svg class="icon"><use href="#i-external"/></svg></a>
+                </div>
+                <h2 class="question-text" id="question-text"></h2>
+
+                <div id="answer-area">
+                  <div class="field-label"><label for="answer-input" id="answer-type-label">Your answer</label><span id="word-count">0 words</span></div>
+                  <textarea id="answer-input" class="answer-input" spellcheck="true" placeholder="Talk through your reasoning. Be specific about trade-offs and edge cases…"></textarea>
+                  <div class="code-editor hidden" id="code-editor" aria-labelledby="answer-type-label"></div>
+                  <p class="hint" id="editor-hint"></p>
+                  <p class="inline-error hidden" id="answer-error" role="alert"></p>
+                  <div class="button-row spread">
+                    <button class="btn btn-ghost" id="save-question-button" type="button"><svg class="icon"><use href="#i-bookmark"/></svg><span>Save for review</span><kbd>S</kbd></button>
+                    <button class="btn btn-primary" id="submit-button" type="button"><span>Submit answer</span><kbd class="on-primary">Ctrl ↵</kbd></button>
+                  </div>
+                </div>
+
+                <div class="feedback hidden" id="feedback">
+                  <div class="feedback-head">
+                    <h3 id="feedback-heading" tabindex="-1">What you covered</h3>
+                    <span class="score-pill" id="score-pill" title="Share of rubric concepts your answer mentions. A keyword heuristic, not a grade."></span>
+                  </div>
+                  <ul class="concept-list" id="concept-list"></ul>
+                  <p class="footnote" id="feedback-note"></p>
+
+                  <div class="explain-block">
+                    <span class="kicker">The why</span>
+                    <p id="explanation-text"></p>
+                  </div>
+
+                  <details class="disclosure" id="compare-block">
+                    <summary><span id="compare-summary">Compare with the model answer</span><svg class="icon chevron"><use href="#i-chevron"/></svg></summary>
+                    <div class="compare-grid">
+                      <div><span class="kicker">Your answer</span><pre id="your-answer"></pre></div>
+                      <div><span class="kicker">Model answer</span><pre id="solution-text"></pre></div>
+                    </div>
+                  </details>
+
+                  <div class="button-row spread">
+                    <button class="btn btn-ghost" id="feedback-save-button" type="button"><svg class="icon"><use href="#i-bookmark"/></svg><span>Save for review</span></button>
+                    <button class="btn btn-primary" id="next-button" type="button"><span>Next question</span><kbd class="on-primary">N</kbd></button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <aside class="session-rail" aria-label="Session summary">
+            <section class="card rail-card">
+              <h2 class="rail-title">This session</h2>
+              <div class="stat-pair"><div><b id="session-answered">0</b><span>answered</span></div><div><b id="session-average">–</b><span>avg match</span></div></div>
+            </section>
+            <section class="card rail-card">
+              <h2 class="rail-title">Overall</h2>
+              <div class="stat-pair"><div><b id="rail-average">–</b><span>avg match</span></div><div><b id="rail-weak">0</b><span>to revisit</span></div></div>
+              <div class="meter" aria-hidden="true"><i id="rail-progress-fill"></i></div>
+            </section>
+            <section class="card rail-card tip-card">
+              <h2 class="rail-title">Interview tip</h2>
+              <p id="tip-text">Strong answers explain not just <em>what</em> works, but <em>why</em>.</p>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <!-- LEARN -->
+      <section class="view" id="learn-view" aria-labelledby="learn-title">
+        <div class="page-intro">
+          <div class="eyebrow"><span class="eyebrow-line"></span>Python field notes</div>
+          <h1 id="learn-title">Learn the <em>why behind Python.</em></h1>
+          <p class="intro-copy">Short concept guides with examples. Keep the lessons that matter and add your own notes.</p>
+        </div>
+        <div class="toolbar">
+          <label class="search-field"><svg class="icon"><use href="#i-search"/></svg><span class="visually-hidden">Search lessons</span><input id="theory-search" type="search" placeholder="Search lessons…"></label>
+          <label class="chip-select"><span>Topic</span><select id="theory-topic-filter"><option value="">All topics</option></select></label>
+          <div class="segmented" role="group" aria-label="Lesson filter"><button class="selected" data-theory-filter="all" aria-pressed="true">All</button><button data-theory-filter="saved" aria-pressed="false">Saved <span class="count" id="saved-theory-count">0</span></button></div>
+          <a class="btn btn-secondary" href="/api/theory/export.csv"><svg class="icon"><use href="#i-download"/></svg><span>Export CSV</span></a>
+        </div>
+        <div class="learn-layout">
+          <div class="lesson-list-wrap">
+            <p class="list-summary" id="learn-summary"></p>
+            <ul class="lesson-list" id="lesson-list" aria-label="Lessons"></ul>
+          </div>
+          <article class="card lesson-detail" id="lesson-detail" tabindex="-1"></article>
+        </div>
+        <p class="footnote">Export downloads a CSV of saved lessons and notes that you can import into Google Sheets.</p>
+      </section>
+
+      <!-- WEAK SPOTS -->
+      <section class="view" id="weaknesses-view" aria-labelledby="weak-title">
+        <div class="page-intro">
+          <div class="eyebrow"><span class="eyebrow-line"></span>Targeted review</div>
+          <h1 id="weak-title">Turn weak spots <em>into strengths.</em></h1>
+          <p class="intro-copy">Missed or saved questions live here. Revisit them until the reasoning sticks.</p>
+        </div>
+        <div class="toolbar spread">
+          <span class="muted" id="weakness-summary">Loading your review queue…</span>
+          <button class="btn btn-primary" id="review-weak-button" type="button"><span>Practice a random weak spot</span><svg class="icon"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="weakness-list" id="weakness-list"></div>
+      </section>
+
+      <!-- PROGRESS -->
+      <section class="view" id="progress-view" aria-labelledby="progress-title">
+        <div class="page-intro">
+          <div class="eyebrow"><span class="eyebrow-line"></span>Your practice record</div>
+          <h1 id="progress-title">Progress, not <em>perfection.</em></h1>
+          <p class="intro-copy">Patterns are more useful than a single score. See where your practice is taking you.</p>
+        </div>
+        <div class="stat-tiles">
+          <div class="card tile"><span>Answers submitted</span><b id="progress-attempts">0</b></div>
+          <div class="card tile"><span>Average rubric match</span><b id="progress-average">–</b></div>
+          <div class="card tile"><span>Day streak</span><b id="progress-streak">0</b></div>
+          <div class="card tile"><span>Active weak spots</span><b id="progress-weak">0</b></div>
+        </div>
+        <div class="progress-grid">
+          <section class="card chart-card">
+            <div class="section-head"><h2>Average match by day</h2><span>Last 30 practice days</span></div>
+            <div class="chart" id="trend-chart"></div>
+            <details class="disclosure table-toggle"><summary><span>Show as table</span><svg class="icon chevron"><use href="#i-chevron"/></svg></summary><div id="trend-table"></div></details>
+          </section>
+          <section class="card chart-card">
+            <div class="section-head"><h2>Topic × level</h2><span>Average match · attempts</span></div>
+            <div id="matrix-chart"></div>
+          </section>
+        </div>
+        <section class="card chart-card">
+          <div class="section-head"><h2>Recent attempts</h2><span>Latest first</span></div>
+          <div id="recent-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <nav class="tab-bar" aria-label="Main navigation (mobile)">
+      <button data-view="practice" class="active"><svg class="icon"><use href="#i-target"/></svg>Practice</button>
+      <button data-view="learn"><svg class="icon"><use href="#i-book"/></svg>Learn</button>
+      <button data-view="weaknesses"><svg class="icon"><use href="#i-rotate"/></svg>Review</button>
+      <button data-view="progress"><svg class="icon"><use href="#i-chart"/></svg>Progress</button>
+    </nav>
+  </div>
+
+  <dialog class="dialog" id="shortcuts-dialog" aria-labelledby="shortcuts-title">
+    <div class="dialog-head"><h2 id="shortcuts-title">Keyboard shortcuts</h2><button class="icon-button" id="close-shortcuts" type="button" aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button></div>
+    <dl class="shortcut-list">
+      <div><dt><kbd>Ctrl</kbd> <kbd>↵</kbd></dt><dd>Submit your answer</dd></div>
+      <div><dt><kbd>N</kbd></dt><dd>Next question (after feedback)</dd></div>
+      <div><dt><kbd>S</kbd></dt><dd>Save the current question for review</dd></div>
+      <div><dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Practice, Learn, Weak spots, Progress</dd></div>
+      <div><dt><kbd>Tab</kbd></dt><dd>Indent in the code editor (<kbd>Esc</kbd> then <kbd>Tab</kbd> to move on)</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>Show this list</dd></div>
+    </dl>
+  </dialog>
+
+  <div class="chart-tooltip hidden" id="chart-tooltip" role="tooltip"></div>
+  <div class="visually-hidden" id="practice-status" role="status" aria-live="polite"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
