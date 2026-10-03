@@ -56,6 +56,15 @@ Nobody writes to `instance/` or `static/vendor/`.
    - APPROVED: move the task to `done/` and commit.
 6. After a batch is done, ask lead-engineer whether `ARCHITECTURE.md` needs updating. (The API contract is kept current per task: backend promotes its PLANNED entry, and the reviewer flags a stale contract as SHOULD-FIX.)
 
+## Lanes and dispatching
+- Work runs in three lanes: **backend** (Python files + `tests/`), **frontend** (`templates/` + `static/`) and **design** (`docs/design/` + new task files). Lanes run in parallel; within a lane, run one task at a time, because its tasks share files (`app.py`, `tests/test_app.py`, `static/app.js`, `design-system.md`).
+- Do not start the next task in a lane until the current task's review verdict is in: the reviewer reads the same files, and a changes-requested round needs them unchanged. While a task is held (for example approved but waiting for a human check), the lane may continue if the next task does not depend on it.
+- Two design runs may overlap only if you give them disjoint files (name which spec, which task files, and who may touch `design-system.md`) and disjoint ID ranges.
+- In every dispatch prompt, give: the task file path; which recently landed tasks it must keep intact; which files other agents are editing right now (do not touch them); for reviews, the round number; known flaky tests (currently `test_coding_question_includes_a_python_starter`, about 1 run in 27: re-run, do not count it).
+- Pass small review notes forward: NITs from an approved task that touch the files of the next task in the same lane are added to that next dispatch. The implementer lists them in its notes under "Folded-in review NITs". Notes that belong to another owner go to that owner's next task or to the lead.
+- If an agent is cut off (rate limit, error), check what it left on disk before re-dispatching, and tell the new run to continue from that state.
+- Browser and screen-reader checks that no agent ran stay unticked and are marked "PENDING manual check" in the task file. A task may move to `done/` with PENDING checks only if its review approved the code; list it in the next status report. A task whose risk depends on such a check (for example TASK-002) stays in `review/` until the human runs it.
+
 ## Rules
 - Move a task file to `in-progress/` before dispatching it.
 - Give each subagent the task file path, not a paraphrase.
