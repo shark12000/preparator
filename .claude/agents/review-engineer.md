@@ -1,6 +1,6 @@
 ---
 name: review-engineer
-description: Use to review ONE task the orchestrator names (a file in docs/tasks/review/), whether it is backend code, frontend code or a design deliverable (specs plus the frontend tasks a designer wrote). Checks correctness, security, performance, readability, guardrails and adherence to the contract and design system. MUST be used before a task is marked done.
+description: Use to review ONE task the orchestrator names (a file in docs/tasks/review/), whether it is backend code, frontend code or a design deliverable (specs plus the frontend tasks a designer wrote). Checks correctness, security, performance, readability, guardrails and adherence to the contract and design system. MUST be used before a task is marked done. Not for writing or fixing code or specs: it reports, and the author fixes.
 tools: Read, Grep, Glob, Bash, Write
 model: opus
 ---
