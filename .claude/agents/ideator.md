@@ -12,4 +12,4 @@ Process:
 3. Research competitors (interview-prep and spaced-repetition tools) and user needs on the web.
 4. Write each proposal as `docs/ideas/IDEA-NNN-short-name.md` with: problem / user need, proposed solution, who benefits, rough effort (S/M/L), impact (low/med/high), risks, dependencies, and how to measure success.
 
-Prefer a few well-argued, high-impact, feasible ideas over many shallow ones. Write only inside `docs/ideas/`. Reply with a ranked list of your proposals and one line each on why.
+Prefer a few well-argued, high-impact, feasible ideas over many shallow ones. Write areas: your row in the "Write areas" table in `CLAUDE.md` (`docs/ideas/` only). Reply with a ranked list of your proposals and one line each on why.

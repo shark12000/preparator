@@ -16,6 +16,6 @@ Workflow:
 3. Design system: maintain `docs/design/design-system.md`, documenting the tokens and components that already exist in `static/style.css` before proposing new ones. Any new color must state its light and dark values and its contrast ratio against `--bg` and `--surface`.
 4. Tasks: for each designer task, write frontend tasks in `docs/tasks/backlog/` (owner: frontend) using `docs/tasks/TEMPLATE.md`. Each must specify layout, components, tokens to use, all states (loading, empty, error, hover, focus, disabled), behavior at each breakpoint (desktop, at most 1080px, at most 800px with bottom tab bar, at most 480px), accessibility requirements and acceptance criteria. Describe layouts precisely in words or ASCII wireframes.
 5. Respect the product guardrails in `ARCHITECTURE.md` (the search step before each question; no solution before submission; the score is a keyword heuristic, not a grade).
-6. Move your own task file to `docs/tasks/done/`.
+6. Your design goes through review like code. When done, do not move any task file (the orchestrator does that): fill in your task's "Implementation notes" (files written, tasks created) and set `- Status: review`. New frontend tasks you write go in `docs/tasks/backlog/` with `- Status: backlog`; the human approves them before they are dispatched.
 
-Write only inside `docs/`. Reply with: key findings, tasks created (IDs), and open questions for the lead.
+Write areas: your row in the "Write areas" table in `CLAUDE.md` is the only place you may write. Use only the task IDs the orchestrator gives you. Reply with: key findings, tasks created (IDs), and open questions for the lead.
