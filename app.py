@@ -519,21 +519,6 @@ def next_question():
     preferences, failure = read_json_object()
     if failure:
         return failure
-    if not preferences.get("source_confirmed"):
-        return jsonify({"error": "Search recent interview coverage in your browser before continuing."}), 428
-    source_url = preferences.get("source_url", "")
-    source_query = preferences.get("search_query", "")
-    allowed_hosts = {"google.com", "www.google.com", "bing.com", "www.bing.com", "duckduckgo.com"}
-    source_ok = isinstance(source_url, str) and isinstance(source_query, str) and source_query.strip()
-    if source_ok:
-        try:
-            parsed_source = urlparse(source_url)
-            source_ok = parsed_source.scheme == "https" and parsed_source.hostname in allowed_hosts
-        except ValueError:
-            source_ok = False
-    if not source_ok:
-        return jsonify({"error": "A valid public search link is required before a question can be served."}), 400
-    source_query = source_query.strip()
     requested_id = preferences.get("question_id")
     if requested_id is not None and not is_int_id(requested_id):
         return jsonify({"error": "question_id must be an integer."}), 400
@@ -552,12 +537,7 @@ def next_question():
         row = pick_question(database, preferences)
         if row is None:
             return jsonify({"error": "No questions match those filters yet."}), 404
-    return jsonify(
-        {
-            "question": question_dict(row),
-            "sources": [{"title": f"Web search: {source_query}", "url": source_url}],
-        }
-    )
+    return jsonify({"question": question_dict(row)})
 
 
 def pick_question(database, preferences):

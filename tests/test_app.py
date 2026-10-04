@@ -142,9 +142,11 @@ class PreparatorTests(unittest.TestCase):
         )
         self.assertEqual(response.get_json()["question"]["id"], question_id)
 
-    def test_question_requires_search_confirmation_before_serving(self):
+    def test_question_is_served_without_any_search_fields(self):
         response = self.client.post("/api/question", json={"topic": "Python Core"})
-        self.assertEqual(response.status_code, 428)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["question"]["topic"], "Python Core")
+        self.assertEqual(self.client.post("/api/question", json={}).status_code, 200)
 
     def test_question_bank_covers_every_level_and_filters_correctly(self):
         levels = {question["difficulty"] for question in preparator.QUESTION_BANK}
@@ -356,30 +358,32 @@ class PreparatorTests(unittest.TestCase):
         response = self.client.get("/api/dashboard")
         self.assertEqual(response.get_json()["question_count"], len(preparator.QUESTION_BANK))
 
-    def test_confirmed_search_serves_one_question_with_source_link(self):
-        response = self.client.post(
-            "/api/question",
-            json={
-                "topic": "Python Core",
-                "source_confirmed": True,
-                "source_url": "https://www.google.com/search?q=Python+interview+questions",
-                "search_query": "Python interview questions",
-            },
-        )
+    def test_question_response_has_only_the_question_key(self):
+        response = self.client.post("/api/question", json={"topic": "Python Core"})
         self.assertEqual(response.status_code, 200)
-        self.assertIn("question", response.get_json())
-        self.assertEqual(len(response.get_json()["sources"]), 1)
+        self.assertEqual(set(response.get_json()), {"question"})
 
-    def test_untrusted_search_link_is_rejected(self):
-        response = self.client.post(
-            "/api/question",
-            json={
-                "source_confirmed": True,
-                "source_url": "https://example.com/search?q=python",
-                "search_query": "Python interview questions",
-            },
+    def test_legacy_search_fields_are_ignored(self):
+        legacy = (
+            {"source_confirmed": False},
+            {"source_url": "https://example.com/search?q=python"},
+            {"source_url": 5},
+            {"source_url": ["https://google.com"]},
+            {"search_query": None},
+            {"search_query": ""},
+            {"source_confirmed": True, "source_url": "https://www.google.com/search?q=x", "search_query": "x"},
         )
+        for payload in legacy:
+            with self.subTest(payload=payload):
+                response = self.client.post("/api/question", json=payload)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(set(response.get_json()), {"question"})
+
+    def test_removed_confirmation_check_no_longer_runs_before_validation(self):
+        response = self.client.post(
+            "/api/question", json={"source_confirmed": False, "question_id": "1"})
         self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {"error": "question_id must be an integer."})
 
     def test_low_score_adds_question_to_weakness_queue(self):
         with preparator.app.app_context():
@@ -863,7 +867,9 @@ class PreparatorTests(unittest.TestCase):
         preparator.app.config["DATABASE"] = path
         client = preparator.app.test_client()
         with mock.patch.dict(preparator.app.config, {"PROPAGATE_EXCEPTIONS": False}):
-            response = client.get("/api/dashboard")
+            with self.assertLogs(preparator.app.logger, level="ERROR") as logs:
+                response = client.get("/api/dashboard")
+            self.assertIn(self._newer_message(), " ".join(logs.output))
             self.assertEqual(response.status_code, 500)
             self.assertEqual(response.get_json(), {"error": "Something went wrong. Try again."})
             self.assertNotIn(path, preparator._initialized_databases)
@@ -873,6 +879,35 @@ class PreparatorTests(unittest.TestCase):
             connection.close()
             self.assertEqual(client.get("/api/dashboard").status_code, 200)
         self.assertIn(path, preparator._initialized_databases)
+
+    def test_prepare_database_lets_other_exceptions_propagate(self):
+        original = preparator.app.config["DATABASE"]
+        self.addCleanup(preparator.app.config.__setitem__, "DATABASE", original)
+        preparator.app.config["DATABASE"] = self._fresh_database_path()
+        stderr = io.StringIO()
+        with mock.patch.object(preparator, "init_db", side_effect=RuntimeError("boom")),                 contextlib.redirect_stderr(stderr), self.assertRaises(RuntimeError) as caught:
+            preparator.prepare_database()
+        self.assertEqual(str(caught.exception), "boom")
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_newer_version_check_runs_before_any_write(self):
+        path = self._newer_database()
+        statements = []
+        real_connect = sqlite3.connect
+
+        def traced_connect(*args, **kwargs):
+            connection = real_connect(*args, **kwargs)
+            connection.set_trace_callback(statements.append)
+            return connection
+
+        with mock.patch.object(preparator.sqlite3, "connect", traced_connect):
+            with self.assertRaises(preparator.SchemaTooNewError):
+                self._run_init(path)
+        self.assertIn("PRAGMA user_version", statements)
+        writes = ("INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "REPLACE",
+                  "PRAGMA USER_VERSION =")
+        for statement in statements:
+            self.assertFalse(statement.strip().upper().startswith(writes), statement)
 
     def test_prepare_database_exits_on_newer_database_only(self):
         original = preparator.app.config["DATABASE"]
@@ -1213,7 +1248,6 @@ class PreparatorTests(unittest.TestCase):
 
     BODY_MSG = "The request body must be a JSON object."
     ID_MSG = "question_id must be an integer."
-    SOURCE_MSG = "A valid public search link is required before a question can be served."
 
     def test_non_object_bodies_are_400_everywhere(self):
         qid = self._theory_id()
@@ -1225,12 +1259,6 @@ class PreparatorTests(unittest.TestCase):
             self._assert_error(invalid, 400, self.BODY_MSG)
             empty = self.client.post(path, data="", content_type="application/json")
             self._assert_error(empty, 400, self.BODY_MSG)
-
-    def test_source_url_and_query_must_be_strings(self):
-        for override in ({"source_url": 5}, {"source_url": ["https://google.com"]},
-                         {"search_query": 5}, {"search_query": None}, {"source_url": None}):
-            response = self.client.post("/api/question", json=self._search(**override))
-            self._assert_error(response, 400, self.SOURCE_MSG)
 
     def test_bad_question_id_types_are_400(self):
         for bad in ([1], {}, True, False, "1", 1.5):
@@ -1497,12 +1525,12 @@ class PreparatorTests(unittest.TestCase):
         weak = ids[1]
         self._answer_with_score(weak, 2)
         for _ in range(15):
-            response = self.client.post("/api/question", json=self._search(weak_only=True))
+            response = self.client.post("/api/question", json={"weak_only": True})
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.get_json()["question"]["id"], weak)
 
     def test_weak_only_with_empty_queue_is_404(self):
-        response = self.client.post("/api/question", json=self._search(weak_only=True))
+        response = self.client.post("/api/question", json={"weak_only": True})
         self._assert_error(response, 404, "No questions match those filters yet.")
 
     def test_note_length_limit_is_4000_characters(self):
