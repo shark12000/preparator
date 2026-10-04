@@ -1257,6 +1257,186 @@ class PreparatorTests(unittest.TestCase):
         response = self.client.get("/api/theory/export.csv", headers={"Host": "attacker.example"})
         self._assert_error(response, 400, "Unrecognized host.")
 
+    # ---- TASK-018: guardrails, weak spots, lessons, CSV, 404s, selection ----
+    def _question_row(self, mode):
+        with preparator.app.app_context():
+            return preparator.get_db().execute(
+                "SELECT * FROM questions WHERE mode = ? AND retired = 0 LIMIT 1", (mode,)
+            ).fetchone()["id"]
+
+    def _weakness_row(self, qid):
+        with preparator.app.app_context():
+            row = preparator.get_db().execute(
+                "SELECT miss_count, pinned FROM weaknesses WHERE question_id = ?", (qid,)
+            ).fetchone()
+            return None if row is None else (row["miss_count"], row["pinned"])
+
+    def test_question_response_never_includes_solution_explanation_or_criteria(self):
+        # ARCHITECTURE.md guardrail: no solution before submission, for both modes and for the
+        # specific-id path as well as the picker path.
+        forbidden = {"solution", "explanation", "criteria", "key_points", "example"}
+        for mode in ("Theory", "Coding"):
+            qid = self._question_row(mode)
+            for extra in ({"mode": mode}, {"question_id": qid}):
+                with self.subTest(mode=mode, extra=extra):
+                    response = self.client.post("/api/question", json=self._search(**extra))
+                    self.assertEqual(response.status_code, 200)
+                    body = response.get_json()
+                    self.assertFalse(forbidden & set(body["question"]), body["question"].keys())
+                    self.assertFalse(forbidden & set(body), body.keys())
+                    with preparator.app.app_context():
+                        row = preparator.get_db().execute(
+                            "SELECT solution, explanation FROM questions WHERE id = ?",
+                            (body["question"]["id"],),
+                        ).fetchone()
+                    text = response.get_data(as_text=True)
+                    self.assertNotIn(row["solution"], text)
+                    self.assertNotIn(row["explanation"], text)
+
+    def test_answer_response_has_heuristic_feedback_note_and_the_solution(self):
+        for mode in ("Theory", "Coding"):
+            qid = self._question_row(mode)
+            with self.subTest(mode=mode):
+                response = self.client.post(
+                    "/api/answer", json={"question_id": qid, "answer": "my attempt number one"}
+                )
+                self.assertEqual(response.status_code, 200)
+                body = response.get_json()
+                self.assertIn("keyword rubric", body["feedback_note"])
+                self.assertIn("not an AI judgment", body["feedback_note"])
+                with preparator.app.app_context():
+                    row = preparator.get_db().execute(
+                        "SELECT solution, explanation FROM questions WHERE id = ?", (qid,)
+                    ).fetchone()
+                self.assertEqual(body["solution"], row["solution"])
+                self.assertEqual(body["explanation"], row["explanation"])
+                self.assertTrue({"score", "matched", "missing", "weak_queue"} <= set(body))
+
+    def test_pin_creates_unmissed_pinned_row(self):
+        qid = self._first_question_id()
+        self.assertEqual(self.client.post(f"/api/weakness/{qid}", json={}).get_json(), {"saved": True})
+        self.assertEqual(self._weakness_row(qid), (0, 1))
+
+    def test_pin_on_existing_missed_row_keeps_miss_count(self):
+        qid = self._first_question_id()
+        self._answer_with_score(qid, 2)
+        self._answer_with_score(qid, 3)
+        self.assertEqual(self._weakness_row(qid), (2, 0))
+        self.assertEqual(self.client.post(f"/api/weakness/{qid}", json={}).status_code, 200)
+        self.assertEqual(self._weakness_row(qid), (2, 1))
+
+    def test_delete_weakness_removes_pinned_and_unpinned_rows(self):
+        pinned = self._first_question_id()
+        with preparator.app.app_context():
+            missed = preparator.get_db().execute(
+                "SELECT id FROM questions WHERE retired = 0 AND id != ? LIMIT 1", (pinned,)
+            ).fetchone()[0]
+        self.client.post(f"/api/weakness/{pinned}", json={})
+        self._answer_with_score(missed, 2)
+        self.assertIsNotNone(self._weakness_row(pinned))
+        self.assertIsNotNone(self._weakness_row(missed))
+        for qid in (pinned, missed):
+            response = self.client.delete(f"/api/weakness/{qid}")
+            self.assertEqual(response.get_json(), {"removed": True})
+            self.assertIsNone(self._weakness_row(qid))
+        self.assertEqual(self.client.get("/api/dashboard").get_json()["weak_count"], 0)
+
+    def test_weak_only_serves_only_weak_questions(self):
+        with preparator.app.app_context():
+            ids = [r[0] for r in preparator.get_db().execute(
+                "SELECT id FROM questions WHERE retired = 0 ORDER BY id LIMIT 3")]
+        weak = ids[1]
+        self._answer_with_score(weak, 2)
+        for _ in range(15):
+            response = self.client.post("/api/question", json=self._search(weak_only=True))
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json()["question"]["id"], weak)
+
+    def test_weak_only_with_empty_queue_is_404(self):
+        response = self.client.post("/api/question", json=self._search(weak_only=True))
+        self._assert_error(response, 404, "No questions match those filters yet.")
+
+    def test_note_length_limit_is_4000_characters(self):
+        qid = self._theory_id()
+        ok = self.client.post(f"/api/theory/{qid}", json={"note": "n" * 4000})
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(len(self._note(qid)), 4000)
+        too_long = self.client.post(f"/api/theory/{qid}", json={"note": "m" * 4001})
+        self._assert_error(too_long, 400, "Notes must be text shorter than 4,000 characters.")
+        self.assertEqual(self._note(qid), "n" * 4000)
+
+    def test_csv_export_header_bom_and_filename(self):
+        qid = self._theory_id()
+        self.client.post(f"/api/theory/{qid}", json={"note": "plain note"})
+        response = self.client.get("/api/theory/export.csv")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.headers["Content-Type"].startswith("text/csv"))
+        self.assertEqual(
+            response.headers["Content-Disposition"], "attachment; filename=preparator-theory.csv"
+        )
+        self.assertTrue(response.data.startswith(b"\xef\xbb\xbf"))
+        lines = response.data.decode("utf-8-sig").splitlines()
+        self.assertEqual(lines[0], "Topic,Level,Theory,Explanation,Example,My notes,Saved at")
+
+    def test_csv_export_neutralizes_every_formula_prefix(self):
+        import csv
+        import io
+
+        qid = self._theory_id()
+        for prefix in ("=", "+", "-", "@", "\t", "\r"):
+            with self.subTest(prefix=repr(prefix)):
+                note = prefix + "cmd|' /C calc'!A0"
+                self.client.post(f"/api/theory/{qid}", json={"note": note})
+                text = self.client.get("/api/theory/export.csv").data.decode("utf-8-sig")
+                rows = list(csv.reader(io.StringIO(text, newline="")))
+                self.assertEqual(len(rows), 2)
+                self.assertEqual(rows[1][5], "'" + note)
+        self.client.post(f"/api/theory/{qid}", json={"note": "safe text"})
+        text = self.client.get("/api/theory/export.csv").data.decode("utf-8-sig")
+        self.assertEqual(list(csv.reader(io.StringIO(text, newline="")))[1][5], "safe text")
+
+    def test_unknown_question_id_is_404_on_question_and_answer(self):
+        with preparator.app.app_context():
+            missing = preparator.get_db().execute("SELECT MAX(id) FROM questions").fetchone()[0] + 1000
+        self._assert_error(
+            self.client.post("/api/question", json=self._search(question_id=missing)), 404, "Question not found."
+        )
+        self._assert_error(
+            self.client.post("/api/answer", json={"question_id": missing, "answer": "x"}), 404, "Question not found."
+        )
+        self.assertEqual(self.client.get("/api/dashboard").get_json()["attempts"], 0)
+
+    def test_filters_with_no_match_are_404(self):
+        for filters in ({"topic": "No Such Topic"}, {"difficulty": "Impossible"}, {"mode": "Oral"}):
+            with self.subTest(filters=filters):
+                response = self.client.post("/api/question", json=self._search(**filters))
+                self._assert_error(response, 404, "No questions match those filters yet.")
+
+    def test_least_practiced_question_is_served_first(self):
+        with preparator.app.app_context():
+            database = preparator.get_db()
+            group = database.execute(
+                "SELECT topic, difficulty, mode FROM questions WHERE retired = 0 "
+                "GROUP BY topic, difficulty, mode HAVING COUNT(*) BETWEEN 2 AND 6 LIMIT 1"
+            ).fetchone()
+            ids = [r[0] for r in database.execute(
+                "SELECT id FROM questions WHERE retired = 0 AND topic = ? AND difficulty = ? AND mode = ? "
+                "ORDER BY id", tuple(group))]
+        self.assertGreaterEqual(len(ids), 2)
+        filters = dict(group)
+        left_out = ids[-1]
+        for qid in ids[:-1]:
+            self._answer_with_score(qid, 10)
+        for _ in range(10):
+            response = self.client.post("/api/question", json=self._search(**filters))
+            self.assertEqual(response.get_json()["question"]["id"], left_out)
+        # Once the left-out one is practiced twice, an id practiced once is preferred again.
+        self._answer_with_score(left_out, 10)
+        self._answer_with_score(left_out, 10)
+        for _ in range(10):
+            response = self.client.post("/api/question", json=self._search(**filters))
+            self.assertNotEqual(response.get_json()["question"]["id"], left_out)
+
 
 if __name__ == "__main__":
     unittest.main()
