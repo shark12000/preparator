@@ -21,7 +21,9 @@ Preparator is a local, single-process Flask application. Flask serves one HTML p
 ## Data Model
 
 - `questions` stores prompts, topic, difficulty, mode, answer criteria, explanations, examples, optional starter code, and a `retired` flag. `init_db()` runs once per database file per process, on the first connection (ADR-003). In one transaction it applies pending schema migrations and then seeds: it inserts new prompts from `QUESTION_BANK` and refreshes criteria, explanation, solution, and starter code on existing rows (matched by topic, difficulty, mode, and prompt), so editing a prompt's text creates a new row while editing its content updates in place. Rows whose identity is no longer in the bank are marked `retired` (ADR-005): they are never served for practice or listed in Learn or Weak spots, and not counted in the bank size, but they are kept so user history stays attached (their attempts still count in the progress aggregates, and saved lessons on them stay in the CSV export). Because the prompt is part of the identity, bank prompts must be byte-identical across processes, and a changed prompt retires its row with no merge migration (ADR-005 addendum).
-- `attempts` stores each submitted answer, rubric score, and timestamp.
+  A rubric criterion is `{label, keywords}`; ADR-017 (planned, TASK-067) adds optional `related` terms (partial credit, half weight) and `alternatives` (`{label, keywords}`, full credit, shown as "Also valid"). These live in the `criteria` JSON, so they need no schema change.
+- `attempts` stores each submitted answer, rubric score, and timestamp. The score is always the rubric's; nothing the user marks afterwards changes it.
+- `rubric_overrides` (planned, ADR-017, migration step 4, TASK-068) records "I covered this" per attempt and criterion (index plus a label snapshot). It is kept apart from the score, the weak queue and the aggregates, and exists to show the user's mark and to find rubrics that miss real answers.
 - `weaknesses` tracks questions to revisit, including misses and user-pinned items.
 - `saved_lessons` stores theory question IDs with a personal note, a `saved` flag, and a save timestamp. Unsaving a lesson clears the flag and keeps a non-empty note (ADR-004).
 
@@ -44,7 +46,7 @@ Browser `localStorage` holds volatile UI state only; SQLite holds all durable pr
 1. `GET /` serves the application shell.
 2. Practice opens on an intro with the filters and one primary button; pressing it serves the question (nothing is requested on page load; ADR-016 decision 7). `POST /api/question` returns one question chosen by the filters (least practiced first), or the weak-spot queue in review mode. An optional `question_id` serves that specific question (used by "Practice this one" in Weak spots). There is no search or confirmation step (ADR-016); legacy `source_confirmed`, `source_url` and `search_query` fields are ignored if sent.
    Status: planned (api-contract PLANNED-13, TASK-061; UI from TASK-062). Until then the code opens a Google search in a new tab, waits for a self-attested "I've reviewed it", and the server requires the confirmation flag and an allowed search URL.
-3. `POST /api/answer` applies a keyword rubric, stores the attempt, updates the weakness queue, and returns matched/missing criteria, theory, and the example solution.
+3. `POST /api/answer` applies a keyword rubric, stores the attempt, updates the weakness queue, and returns matched/missing criteria, theory, and the example solution. Planned (ADR-017, PLANNED-14/15): per-concept states (covered, partly covered, not detected; no "wrong" state), matched terms, the attempt id, and a separate endpoint to record "I covered this" without changing the score.
 4. `GET /api/dashboard` returns totals, per-topic and topic × level averages, a daily trend (local dates), the practice streak, weak spots, and recent attempts.
 5. `GET /api/theory` lists theory-mode questions as lessons. `POST` and `DELETE /api/theory/<id>` save or remove a lesson; saved notes are updated through the same `POST` endpoint.
 6. `GET /api/theory/export.csv` exports saved lessons and notes as formula-neutralized CSV for import into Google Sheets. There is no OAuth or automatic spreadsheet sync.
@@ -102,5 +104,6 @@ Decisions are recorded in `docs/architecture/adr/`. Planned API changes are in `
 | ADR-014 | Refuse to open a database whose schema is newer than the code | Accepted (not yet implemented; TASK-050) |
 | ADR-015 | Move the database code out of `app.py` into `db.py` | Accepted (not yet implemented; TASK-051, needs the `CLAUDE.md` write-areas update) |
 | ADR-016 | Remove the search and source-confirmation step before a question | Accepted (human approval 2026-10-04; changes a guardrail; not yet implemented: TASK-061 backend, TASK-062 design, then frontend tasks) |
+| ADR-017 | Graded rubric feedback (partial matches, accepted alternatives) and recorded self-assessment | Accepted (no guardrail change; not yet implemented: TASK-067, TASK-068, TASK-069 backend, TASK-070 design) |
 
-ADR-002 and ADR-005 carry 2026-10-04 clarifications (the `[::1]` rationale; the determinism addendum). ADR-001, ADR-007, ADR-009, ADR-011 and ADR-012 carry 2026-10-04 notes pointing to ADR-016.
+ADR-008 carries a 2026-10-05 note: ADR-017 takes migration step 4, so `review_schedule` uses the next free step. ADR-002 and ADR-005 carry 2026-10-04 clarifications (the `[::1]` rationale; the determinism addendum). ADR-001, ADR-007, ADR-009, ADR-011 and ADR-012 carry 2026-10-04 notes pointing to ADR-016.
