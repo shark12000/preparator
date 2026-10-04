@@ -15,7 +15,7 @@ QUESTION_BANK = [
             {"label": "Hashability caveat", "keywords": ["hash", "dictionary key", "dict key", "set"]},
         ],
         "explanation": "Lists are mutable sequences; tuples are immutable sequences. Choose a list when the collection itself should change, and a tuple for a fixed grouping or when immutability communicates intent. A tuple is hashable only when all its elements are hashable, so not every tuple is safe as a dictionary key.",
-        "solution": "Use a list for a changing work queue, such as tasks.append(task). Use a tuple for a fixed coordinate, such as point = (x, y). A tuple containing a list, such as (1, []), is still unhashable.",
+        "solution": "Lists are mutable, so use one for a collection that changes, such as tasks.append(task). Tuples are immutable, so use one for a fixed record, such as point = (x, y). A tuple is hashable only if all its elements are, so (1, []) cannot be a dictionary key while (1, 2) can.",
     },
     {
         "topic": "Python Core",
@@ -41,7 +41,7 @@ QUESTION_BANK = [
             {"label": "None sentinel pattern", "keywords": ["none", "sentinel", "initialize", "inside"]},
         ],
         "explanation": "Python evaluates default argument expressions once when the function is defined, not on every call. A mutable default therefore keeps state across calls. Use None as a sentinel, create a fresh object inside the function, and annotate the parameter with an optional type where appropriate.",
-        "solution": "def add_item(item, items=None):\n    if items is None:\n        items = []\n    items.append(item)\n    return items",
+        "solution": "Python evaluates default values once, when the function is defined, so a mutable default is the same object shared by every call. Use None as a sentinel and create the list inside the function:\n\ndef add_item(item, items=None):\n    if items is None:\n        items = []\n    items.append(item)\n    return items",
     },
     {
         "topic": "Data Structures",
@@ -122,7 +122,7 @@ QUESTION_BANK = [
             {"label": "__new__ is useful for immutable types or customization", "keywords": ["immutable", "subclass", "customize", "metaclass"]},
         ],
         "explanation": "__new__ is a static-level construction hook that allocates and returns an instance; __init__ then initializes that instance and must return None. __new__ is often overridden when subclassing immutable built-ins, because their value must be established before initialization.",
-        "solution": "class TaggedString(str):\n    def __new__(cls, value, tag):\n        instance = super().__new__(cls, value)\n        instance.tag = tag\n        return instance",
+        "solution": "__new__ creates and returns the instance; __init__ then initializes that existing instance and returns None. Override __new__ when subclassing an immutable type such as str, because the value must be fixed at creation:\n\nclass TaggedString(str):\n    def __new__(cls, value, tag):\n        instance = super().__new__(cls, value)\n        instance.tag = tag\n        return instance",
     },
     {
         "topic": "Python Core",
@@ -135,7 +135,7 @@ QUESTION_BANK = [
             {"label": "Does not enforce types by default", "keywords": ["not enforce", "do not enforce", "runtime", "no runtime"]},
         ],
         "explanation": "Annotations communicate intended types and can power static checkers, IDEs, documentation, and frameworks. Python does not normally reject a call just because its values disagree with annotations; runtime validation requires separate code or a library. Annotations are metadata, not a substitute for input validation.",
-        "solution": "def repeat(text: str, count: int = 1) -> str:\n    return text * count\n\n# A type checker can flag repeat('ha', 'three'); Python itself does not reject it at the call boundary.",
+        "solution": "Annotations document the intended types and let a type checker, IDE or other static analysis tooling catch mistakes. They are metadata: Python does not enforce them at runtime (nothing is checked at the call boundary), so repeat('ha', 'three') is only caught when text * count fails inside the function. Validate input explicitly when it matters.\n\ndef repeat(text: str, count: int = 1) -> str:\n    return text * count",
     },
     {
         "topic": "Python Core",
@@ -148,7 +148,7 @@ QUESTION_BANK = [
             {"label": "Returns None", "keywords": ["none", "returns nothing", "must not return"]},
         ],
         "explanation": "Object creation first obtains an instance through __new__; Python then calls __init__ to initialize that already-created object. __init__ assigns attributes or establishes invariants and must return None. Returning another object from __init__ raises TypeError.",
-        "solution": "class Book:\n    def __init__(self, title: str) -> None:\n        self.title = title\n\nbook = Book('Dune')",
+        "solution": "__init__ initializes the new instance, assigning its attributes after __new__ has created it, and it must return None (returning anything else raises TypeError).\n\nclass Book:\n    def __init__(self, title: str) -> None:\n        self.title = title\n\nbook = Book('Dune')",
     },
     {
         "topic": "Python Core",
@@ -161,7 +161,7 @@ QUESTION_BANK = [
             {"label": "Distinguishes absent keys from stored None when needed", "keywords": ["none", "sentinel", "in operator", "stored value"]},
         ],
         "explanation": "Mapping[key] is appropriate when a missing key is exceptional; otherwise it raises KeyError. For ordinary optional lookups, use get(key, default) or test membership. If None is a valid stored value, membership or a unique sentinel distinguishes a missing key from a key explicitly mapped to None.",
-        "solution": "MISSING = object()\nvalue = settings.get('timeout', MISSING)\nif value is MISSING:\n    value = 30",
+        "solution": "Indexing a missing key raises KeyError. For an optional key use settings.get('timeout', default) or the in operator. If None can be a stored value, use a unique sentinel to tell an absent key from a stored None:\n\nMISSING = object()\nvalue = settings.get('timeout', MISSING)\nif value is MISSING:\n    value = 30",
     },
     {
         "topic": "Data Structures",
@@ -310,7 +310,7 @@ QUESTION_BANK = [
             {"label": "Prefers scoped patches or dependency injection", "keywords": ["dependency injection", "mock", "scoped", "patch.object"]},
         ],
         "explanation": "Monkey patching replaces or adds an attribute on an imported module or class at runtime. It can be useful in tightly scoped tests or compatibility shims, but global patches make behavior depend on import and execution order and can affect unrelated code. Prefer explicit dependency injection or a scoped mock where possible.",
-        "solution": "from unittest.mock import patch\n\nwith patch('service.fetch_data', return_value=[]):\n    result = service.build_report()",
+        "solution": "Monkey patching replaces or modifies a module or class attribute at runtime. It is risky because the change is global and hidden: behavior depends on import and execution order and can surprise unrelated code. Prefer dependency injection or a scoped mock:\n\nfrom unittest.mock import patch\n\nwith patch('service.fetch_data', return_value=[]):\n    result = service.build_report()",
     },
     {
         "topic": "Concurrency",
@@ -323,7 +323,7 @@ QUESTION_BANK = [
             {"label": "Coordinates failure and cancellation", "keywords": ["cancel", "exception group", "failure", "propagate"]},
         ],
         "explanation": "TaskGroup provides structured concurrency: child tasks belong to a lexical scope, and the scope does not finish until they finish. If a child fails, the group cancels remaining tasks and reports failures when exiting. This makes task lifetime and error handling explicit, unlike fire-and-forget tasks that may outlive their owner. TaskGroup is available in Python 3.11 and later.",
-        "solution": "import asyncio\n\nasync def load_all(loaders):\n    async with asyncio.TaskGroup() as group:\n        tasks = [group.create_task(loader()) for loader in loaders]\n    return [task.result() for task in tasks]",
+        "solution": "TaskGroup gives child tasks a scope: leaving the async with block waits for all of them to complete, so none outlive their owner. If one fails, the group cancels the rest and propagates the failures as an ExceptionGroup (Python 3.11+).\n\nimport asyncio\n\nasync def load_all(loaders):\n    async with asyncio.TaskGroup() as group:\n        tasks = [group.create_task(loader()) for loader in loaders]\n    return [task.result() for task in tasks]",
     },
     {
         "topic": "Data Structures",

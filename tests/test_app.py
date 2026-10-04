@@ -1,12 +1,16 @@
 import json
 import os
 import sqlite3
+import sys
 import tempfile
 import threading
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
 from unittest import mock
 import app as preparator
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bank_identities  # noqa: E402
 
 
 class PreparatorTests(unittest.TestCase):
@@ -88,14 +92,16 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(dashboard["streak"], 45)
         self.assertEqual(len(dashboard["trend"]), 30)
 
-    @unittest.skipIf(
-        datetime.now().astimezone().utcoffset() <= timedelta(0),
-        "needs a local zone ahead of UTC: only there does 00:30 local fall on the previous UTC day",
+    @unittest.skipUnless(
+        timedelta(0) < datetime.now().astimezone().utcoffset() <= timedelta(hours=12),
+        "needs a local zone 0 to 12h ahead of UTC: only there does 00:30 local fall on the previous UTC day "
+        "and yesterday noon fall on yesterday in UTC (UTC+13/+14 would put yesterday noon on the day before)",
     )
     def test_dashboard_streak_uses_local_day_for_attempts_just_after_midnight(self):
         # Today 00:30 local is yesterday in UTC, so without 'localtime' it merges with yesterday noon
         # (also yesterday in UTC) and the streak drops to 1. On UTC or behind-UTC machines the test cannot
-        # tell the difference, so it is skipped there instead of giving false assurance.
+        # tell the difference, so it is skipped there instead of giving false assurance. At UTC+13/+14 yesterday
+        # noon is itself on the day before in UTC, so the two rows no longer collide and the test is skipped too.
         self._insert_attempts_on_days_ago([0], at=time(0, 30))
         self._insert_attempts_on_days_ago([1])
         self.assertEqual(self.client.get("/api/dashboard").get_json()["streak"], 2)
@@ -274,16 +280,11 @@ class PreparatorTests(unittest.TestCase):
     def test_coding_starters_are_bare_stubs_matching_the_solution(self):
         import ast
 
-        def is_docstring(node):
-            return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
-
         def signature_names(source, check_bare):
             """Top-level def/class names plus class method names, in order. Optionally assert stub shape."""
             tree = ast.parse(source)
             names = []
             for node in tree.body:
-                if is_docstring(node) and node is tree.body[0]:
-                    continue
                 if check_bare:
                     self.assertIsInstance(node, (ast.FunctionDef, ast.ClassDef))
                 elif not isinstance(node, (ast.FunctionDef, ast.ClassDef)):
@@ -295,8 +296,6 @@ class PreparatorTests(unittest.TestCase):
                         self.assertIsInstance(node.body[0], ast.Pass)
                     continue
                 for member in node.body:
-                    if check_bare and is_docstring(member) and member is node.body[0]:
-                        continue
                     if check_bare:
                         self.assertIsInstance(member, ast.FunctionDef)
                     elif not isinstance(member, ast.FunctionDef):
@@ -315,6 +314,39 @@ class PreparatorTests(unittest.TestCase):
                     signature_names(question["starter_code"], True),
                     signature_names(question["solution"], False),
                 )
+
+    def test_theory_model_answers_meet_their_own_rubric(self):
+        theory = [question for question in preparator.QUESTION_BANK if question["mode"] == "Theory"]
+        self.assertGreater(len(theory), 0)
+        for question in theory:
+            with self.subTest(prompt=question["prompt"]):
+                result = preparator.evaluate_answer(question["solution"], question["criteria"])
+                self.assertGreaterEqual(result["score"], 7, result["missing"])
+
+    def test_bank_identities_baseline_is_still_present(self):
+        # ADR-005: editing or removing a bank identity retires its row and orphans its history.
+        # Additions are fine; a deliberate removal means regenerating the baseline in the same commit.
+        baseline = {tuple(item) for item in bank_identities.load_baseline()}
+        self.assertGreater(len(baseline), 0)
+        missing = sorted(baseline - bank_identities.current_identities())
+        if missing:
+            self.fail(
+                f"{len(missing)} baseline identities are missing from QUESTION_BANK (edited or removed prompts "
+                "retire their rows per ADR-005 and orphan history): "
+                + "; ".join(repr(item) for item in missing[:10])
+                + ". If this is deliberate, regenerate the baseline with "
+                "`.venv/Scripts/python.exe tests/bank_identities.py` and commit it with the change."
+            )
+
+    def test_coding_model_answers_meet_their_own_rubric(self):
+        coding = [question for question in preparator.QUESTION_BANK if question["mode"] == "Coding"]
+        self.assertGreater(len(coding), 0)
+        for question in coding:
+            with self.subTest(prompt=question["prompt"]):
+                result = preparator.evaluate_answer(
+                    question["solution"], question["criteria"], question["starter_code"]
+                )
+                self.assertGreaterEqual(result["score"], 7, result["missing"])
 
     def test_dashboard_reports_canonical_bank_count(self):
         response = self.client.get("/api/dashboard")
