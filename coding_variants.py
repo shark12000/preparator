@@ -261,7 +261,10 @@ def _change_example(index):
 def _word_break_example(index):
     text = f"python{index}" if index % 2 == 0 else f"pythonx{index}"
     words = {"py", "thon", "python", f"{index}"}
-    return f"{text!r}, {words!r}", _can_segment(text, words)
+    # Sorted set literal: a set repr follows the per-process hash seed, and the
+    # prompt is an identity field (ADR-005), so it must be identical on every start.
+    words_literal = "{" + ", ".join(repr(word) for word in sorted(words)) + "}"
+    return f"{text!r}, {words_literal}", _can_segment(text, words)
 
 
 def _longest_unique_example(index):
