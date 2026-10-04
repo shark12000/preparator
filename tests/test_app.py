@@ -127,6 +127,17 @@ class PreparatorTests(unittest.TestCase):
         self.assertTrue(all(count >= 100 for count in counts.values()), counts)
 
     def test_coding_question_includes_a_python_starter(self):
+        # Deterministic: check every Foundations Coding question the endpoint could serve.
+        with preparator.app.app_context():
+            rows = preparator.get_db().execute(
+                "SELECT * FROM questions WHERE difficulty = 'Foundations' AND mode = 'Coding' AND retired = 0"
+            ).fetchall()
+            served = [preparator.question_dict(row) for row in rows]
+        self.assertGreater(len(served), 0)
+        for question in served:
+            with self.subTest(prompt=question["prompt"]):
+                self.assertEqual(question["mode"], "Coding")
+                self.assertTrue(question["starter_code"].startswith("def "))
         response = self.client.post(
             "/api/question",
             json={
@@ -138,9 +149,18 @@ class PreparatorTests(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 200)
-        question = response.get_json()["question"]
-        self.assertEqual(question["mode"], "Coding")
-        self.assertTrue(question["starter_code"].startswith("def "))
+        self.assertEqual(response.get_json()["question"]["mode"], "Coding")
+
+    def test_every_foundations_coding_item_has_starter_code(self):
+        coding = [
+            question for question in preparator.QUESTION_BANK
+            if question["difficulty"] == "Foundations" and question["mode"] == "Coding"
+        ]
+        self.assertGreater(len(coding), 0)
+        for question in coding:
+            with self.subTest(prompt=question["prompt"]):
+                self.assertTrue(question.get("starter_code", "").strip())
+                self.assertNotEqual(question["starter_code"].strip(), question["solution"].strip())
 
     def test_dashboard_reports_canonical_bank_count(self):
         response = self.client.get("/api/dashboard")

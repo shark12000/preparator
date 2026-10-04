@@ -55,6 +55,7 @@ QUESTION_BANK = [
         ],
         "explanation": "Count each character, then scan the original string from left to right and return the first with count one. This preserves the required order. A Counter-based implementation runs in O(n) time and O(k) extra space, where k is the number of distinct characters.",
         "solution": "from collections import Counter\n\ndef first_unique(text: str) -> str | None:\n    counts = Counter(text)\n    return next((char for char in text if counts[char] == 1), None)",
+        "starter_code": "def first_unique(text: str) -> str | None:\n    pass",
     },
     {
         "topic": "Data Structures",
@@ -172,6 +173,7 @@ QUESTION_BANK = [
         ],
         "explanation": "str.split() with no separator treats consecutive whitespace as one delimiter and removes leading/trailing whitespace. Joining the resulting words with a single space creates normalized output. This handles tabs and newlines as well as spaces; whitespace-only input produces an empty string.",
         "solution": "def normalize_whitespace(text: str) -> str:\n    return ' '.join(text.split())",
+        "starter_code": "def normalize_whitespace(text: str) -> str:\n    pass",
     },
     {
         "topic": "Data Structures",
@@ -185,6 +187,7 @@ QUESTION_BANK = [
         ],
         "explanation": "A list comprehension can express the mapping and filter in one readable pass. The condition keeps values divisible by two, and the expression squares each one. It preserves encounter order and leaves the input list unchanged. The time and output space are both O(n).",
         "solution": "def even_squares(values: list[int]) -> list[int]:\n    return [value ** 2 for value in values if value % 2 == 0]",
+        "starter_code": "def even_squares(values: list[int]) -> list[int]:\n    pass",
     },
     {
         "topic": "Data Structures",
@@ -198,6 +201,7 @@ QUESTION_BANK = [
         ],
         "explanation": "Normalize once by retaining alphanumeric characters and applying case folding. A string equals its reverse exactly when it is a palindrome. The empty normalized string compares equal to its reverse, matching the stated convention. The straightforward solution uses O(n) time and O(n) extra space.",
         "solution": "def is_palindrome(text: str) -> bool:\n    normalized = ''.join(char.casefold() for char in text if char.isalnum())\n    return normalized == normalized[::-1]",
+        "starter_code": "def is_palindrome(text: str) -> bool:\n    pass",
     },
     {
         "topic": "Python Core",
