@@ -1171,6 +1171,51 @@ class PreparatorTests(unittest.TestCase):
                 response = self.client.post("/api/question", json=self._search(**{field: bad}))
                 self._assert_error(response, 400, "Filters must be text.")
 
+    # ---- TASK-049 / PLANNED-10: previous_score ----
+    def test_previous_score_null_then_last_attempt_score(self):
+        qid = self._first_question_id()
+        first = self._answer_with_score(qid, 3)
+        self.assertIn("previous_score", first)
+        self.assertIsNone(first["previous_score"])
+        self.assertEqual(self._answer_with_score(qid, 9)["previous_score"], 3)
+        self.assertEqual(self._answer_with_score(qid, 5)["previous_score"], 9)
+
+    def test_previous_score_is_per_question_id(self):
+        with preparator.app.app_context():
+            a, b = [r[0] for r in preparator.get_db().execute(
+                "SELECT id FROM questions WHERE retired = 0 LIMIT 2")]
+        self.assertIsNone(self._answer_with_score(a, 2)["previous_score"])
+        self.assertIsNone(self._answer_with_score(b, 8)["previous_score"])
+        self.assertEqual(self._answer_with_score(a, 6)["previous_score"], 2)
+        self.assertEqual(self._answer_with_score(b, 1)["previous_score"], 8)
+        self.assertEqual(self._answer_with_score(a, 4)["previous_score"], 6)
+
+    def test_rejected_requests_do_not_change_previous_score(self):
+        with preparator.app.app_context():
+            row = preparator.get_db().execute(
+                "SELECT id, starter_code FROM questions WHERE mode = 'Coding' AND retired = 0 "
+                "AND starter_code != '' LIMIT 1").fetchone()
+        qid = row["id"]
+        self._answer_with_score(qid, 4)
+        self.assertEqual(self.client.post(
+            "/api/answer", json={"question_id": qid, "answer": row["starter_code"]}).status_code, 400)
+        self.assertEqual(self.client.post(
+            "/api/answer", json={"question_id": qid, "answer": "  "}).status_code, 400)
+        self.assertEqual(self.client.post(
+            "/api/answer", json={"question_id": 10**9, "answer": "x"}).status_code, 404)
+        self.assertEqual(self._answer_with_score(qid, 8)["previous_score"], 4)
+
+    def test_previous_score_on_retired_id_and_its_successor(self):
+        _, old, ids = self._retire_edited()
+        retired_id = ids[old["Theory"]]
+        self.assertIsNone(self._answer_with_score(retired_id, 3)["previous_score"])
+        self.assertEqual(self._answer_with_score(retired_id, 6)["previous_score"], 3)
+        with preparator.app.app_context():
+            successor = preparator.get_db().execute(
+                "SELECT id FROM questions WHERE retired = 0 AND prompt = ?",
+                (old["Theory"] + " (edited)",)).fetchone()[0]
+        self.assertIsNone(self._answer_with_score(successor, 5)["previous_score"])
+
     def test_non_string_answer_is_rejected(self):
         qid = self._theory_id()
         for bad in (5, None, ["a"], {"a": 1}, True):

@@ -590,10 +590,15 @@ def submit_answer():
         return jsonify({"error": "Replace the starter stub with your solution before submitting."}), 400
     result = evaluate_answer(answer, json.loads(row["criteria"]), starter)
     now = utc_now()
-    database.execute(
+    inserted = database.execute(
         "INSERT INTO attempts (question_id, answer, score, created_at) VALUES (?, ?, ?, ?)",
         (question_id, answer, result["score"], now),
     )
+    # The INSERT opened the transaction, so this read cannot interleave with another submit.
+    previous = database.execute(
+        "SELECT score FROM attempts WHERE question_id = ? AND id < ? ORDER BY id DESC LIMIT 1",
+        (question_id, inserted.lastrowid),
+    ).fetchone()
     existing = database.execute(
         "SELECT pinned FROM weaknesses WHERE question_id = ?", (question_id,)
     ).fetchone()
@@ -628,6 +633,7 @@ def submit_answer():
             "solution": row["solution"],
             "feedback_note": "Concept-match score: a transparent keyword rubric, not an AI judgment. Review the missed concepts below.",
             "weak_queue": {"status": queue_status, "threshold": WEAK_SCORE_THRESHOLD},
+            "previous_score": previous["score"] if previous else None,
         }
     )
 
