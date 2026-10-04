@@ -27,3 +27,6 @@ Thumbs.db
 
 # Claude Code per-user settings (the shared .claude/settings.json is committed)
 .claude/settings.local.json
+
+# Personal learning space for the Sensei agent (local only, not committed)
+learning/

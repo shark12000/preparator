@@ -42,6 +42,8 @@ This table is the single source of truth for who may write where. Agent files po
 
 Nobody writes to `instance/` or `static/vendor/`.
 
+**Outside the team workflow:** the `sensei` agent (`.claude/agents/sensei.md`) is the human's personal mentor. The orchestrator never dispatches it, and it writes only to `learning/` (gitignored, personal). Team agents never write to `learning/`.
+
 ## Task status
 - Agents never move task files. When an agent finishes, it fills in its task's "Implementation notes" and sets `- Status: review` in the file. It reports back; you move the file.
 - You move a file to `in-progress/` before dispatching it, to `review/` when the agent reports done, and to `done/` only after an APPROVED review.
