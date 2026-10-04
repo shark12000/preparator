@@ -4,6 +4,7 @@ import json
 import os
 import re
 import sqlite3
+import sys
 import threading
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlparse
@@ -216,15 +217,25 @@ MIGRATIONS = [
 ]
 
 
+class SchemaTooNewError(RuntimeError):
+    """The database was created by a newer version of Preparator (ADR-014)."""
+
+    def __init__(self, database_version, latest_version):
+        self.database_version = database_version
+        self.latest_version = latest_version
+        super().__init__(
+            f"This database (schema version {database_version}) was created by a newer "
+            f"version of Preparator; this version supports up to {latest_version}. "
+            "Update Preparator, or set PREPARATOR_DATABASE to a different file."
+        )
+
+
 def run_migrations(database):
     """Apply pending steps; the caller owns the open transaction."""
     current = database.execute("PRAGMA user_version").fetchone()[0]
     latest = MIGRATIONS[-1][0]
     if current > latest:
-        app.logger.warning(
-            "Database user_version %s is newer than this app's schema version %s; "
-            "continuing without migrating.", current, latest,
-        )
+        raise SchemaTooNewError(current, latest)  # before any write
     for version, step in MIGRATIONS:
         if current < version:
             step(database)
@@ -465,9 +476,12 @@ def unsave_theory_lesson(question_id):
     database = get_db()
     # ADR-004: keep the note; only clear the flag. Empty notes have nothing to keep.
     database.execute("UPDATE saved_lessons SET saved = 0 WHERE question_id = ?", (question_id,))
-    database.execute(
-        "DELETE FROM saved_lessons WHERE question_id = ? AND note = ''", (question_id,)
-    )
+    row = database.execute(
+        "SELECT note FROM saved_lessons WHERE question_id = ?", (question_id,)
+    ).fetchone()
+    # Decide in Python: SQLite trim() only strips spaces, str.strip() all whitespace.
+    if row is not None and row["note"].strip() == "":
+        database.execute("DELETE FROM saved_lessons WHERE question_id = ?", (question_id,))
     database.commit()
     return jsonify({"saved": False})
 
@@ -665,5 +679,16 @@ def remove_weakness(question_id):
     return jsonify({"removed": True})
 
 
+def prepare_database():
+    """Startup check for `python app.py`: refuse a database newer than the code."""
+    with app.app_context():
+        try:
+            get_db()
+        except SchemaTooNewError as error:
+            print(str(error), file=sys.stderr)
+            raise SystemExit(1)
+
+
 if __name__ == "__main__":
+    prepare_database()
     app.run(debug=os.environ.get("FLASK_DEBUG") == "1", port=int(os.environ.get("PORT", "5000")))

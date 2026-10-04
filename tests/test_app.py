@@ -1,3 +1,4 @@
+import contextlib
 import csv
 import io
 import json
@@ -817,16 +818,76 @@ class PreparatorTests(unittest.TestCase):
                     preparator.init_db()
         self.assertEqual(str(caught.exception), "original")
 
-    def test_newer_database_version_logs_warning_and_continues(self):
+    def _newer_database(self):
+        """Seeded scratch database at latest + 1, with an edited explanation."""
         path = self._fresh_database_path()
         self._run_init(path)
         connection = sqlite3.connect(path)
-        connection.execute("PRAGMA user_version = 99")
+        connection.execute("UPDATE questions SET explanation = 'edited' WHERE id = 1")
+        connection.execute(f"PRAGMA user_version = {preparator.MIGRATIONS[-1][0] + 1}")
+        connection.commit()
         connection.close()
-        with self.assertLogs(preparator.app.logger, level="WARNING") as logs:
+        preparator._initialized_databases.discard(path)
+        return path
+
+    def _db_state(self, path):
+        connection = sqlite3.connect(path)
+        try:
+            return (
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                connection.execute("SELECT COUNT(*) FROM questions").fetchone()[0],
+                connection.execute("SELECT explanation FROM questions WHERE id = 1").fetchone()[0],
+            )
+        finally:
+            connection.close()
+
+    def _newer_message(self):
+        latest = preparator.MIGRATIONS[-1][0]
+        return (f"This database (schema version {latest + 1}) was created by a newer version "
+                f"of Preparator; this version supports up to {latest}. Update Preparator, "
+                "or set PREPARATOR_DATABASE to a different file.")
+
+    def test_newer_database_version_is_refused_without_writes(self):
+        path = self._newer_database()
+        before = self._db_state(path)
+        with self.assertRaises(preparator.SchemaTooNewError) as caught:
             self._run_init(path)
-        self.assertTrue(any("99" in line for line in logs.output))
-        self.assertEqual(self._schema_snapshot(path)[2], 99)
+        self.assertEqual(str(caught.exception), self._newer_message())
+        self.assertEqual(self._db_state(path), before)
+        self.assertEqual(before[2], "edited")
+
+    def test_newer_database_gives_500_and_retries_after_fix(self):
+        path = self._newer_database()
+        original = preparator.app.config["DATABASE"]
+        self.addCleanup(preparator.app.config.__setitem__, "DATABASE", original)
+        preparator.app.config["DATABASE"] = path
+        client = preparator.app.test_client()
+        with mock.patch.dict(preparator.app.config, {"PROPAGATE_EXCEPTIONS": False}):
+            response = client.get("/api/dashboard")
+            self.assertEqual(response.status_code, 500)
+            self.assertEqual(response.get_json(), {"error": "Something went wrong. Try again."})
+            self.assertNotIn(path, preparator._initialized_databases)
+            connection = sqlite3.connect(path)
+            connection.execute(f"PRAGMA user_version = {preparator.MIGRATIONS[-1][0]}")
+            connection.commit()
+            connection.close()
+            self.assertEqual(client.get("/api/dashboard").status_code, 200)
+        self.assertIn(path, preparator._initialized_databases)
+
+    def test_prepare_database_exits_on_newer_database_only(self):
+        original = preparator.app.config["DATABASE"]
+        self.addCleanup(preparator.app.config.__setitem__, "DATABASE", original)
+        preparator.app.config["DATABASE"] = self._newer_database()
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit) as caught:
+            preparator.prepare_database()
+        self.assertEqual(caught.exception.code, 1)
+        self.assertEqual(stderr.getvalue().strip(), self._newer_message())
+        preparator.app.config["DATABASE"] = self._fresh_database_path()
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            preparator.prepare_database()
+        self.assertEqual(stderr.getvalue(), "")
 
     def test_version_1_database_with_saved_lessons_upgrades_to_latest(self):
         path = self._fresh_database_path()
@@ -918,6 +979,28 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(count, 0)
         lesson, _ = self._lesson(qid)
         self.assertFalse(lesson["saved"])
+
+    def _saved_row_count(self, qid):
+        with preparator.app.app_context():
+            return preparator.get_db().execute(
+                "SELECT COUNT(*) FROM saved_lessons WHERE question_id = ?", (qid,)).fetchone()[0]
+
+    def test_unsaving_a_whitespace_only_note_removes_the_row(self):
+        qid = self._theory_id()
+        blank = "  \n\t "
+        self.client.post(f"/api/theory/{qid}", json={"note": blank})
+        self.assertEqual(self._lesson(qid)[0]["note"], blank)  # POST stores it as sent
+        self.assertEqual(self.client.delete(f"/api/theory/{qid}").get_json(), {"saved": False})
+        self.assertEqual(self._saved_row_count(qid), 0)
+        lesson, _ = self._lesson(qid)
+        self.assertEqual((lesson["note"], lesson["saved"]), ("", False))
+
+    def test_unsaving_keeps_a_note_with_text_and_whitespace_exactly(self):
+        qid = self._theory_id()
+        self.client.post(f"/api/theory/{qid}", json={"note": "  keep me \n"})
+        self.client.delete(f"/api/theory/{qid}")
+        lesson, _ = self._lesson(qid)
+        self.assertEqual((lesson["note"], lesson["saved"]), ("  keep me \n", False))
 
     def test_unsaving_a_never_saved_lesson_is_harmless(self):
         qid = self._theory_id()
@@ -1179,6 +1262,24 @@ class PreparatorTests(unittest.TestCase):
         self.assertIsNone(first["previous_score"])
         self.assertEqual(self._answer_with_score(qid, 9)["previous_score"], 3)
         self.assertEqual(self._answer_with_score(qid, 5)["previous_score"], 9)
+
+    def test_submit_inserts_attempt_before_reading_previous_score(self):
+        # Guards the ordering that makes the previous_score read race-free (TASK-049 NIT 1).
+        qid = self._first_question_id()
+        statements = []
+        real_connect = sqlite3.connect
+
+        def tracing_connect(*args, **kwargs):
+            connection = real_connect(*args, **kwargs)
+            connection.set_trace_callback(statements.append)
+            return connection
+
+        with mock.patch.object(preparator.sqlite3, "connect", tracing_connect):
+            self._answer_with_score(qid, 5)
+        insert = next(i for i, s in enumerate(statements) if "INSERT INTO attempts" in s)
+        select = next(i for i, s in enumerate(statements)
+                      if "SELECT score FROM attempts" in s and "id <" in s)
+        self.assertLess(insert, select)
 
     def test_previous_score_is_per_question_id(self):
         with preparator.app.app_context():
