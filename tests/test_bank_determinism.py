@@ -30,7 +30,8 @@ print(total, active)
 
 
 def run_python(script, hash_seed, database=None):
-    env = dict(os.environ, PYTHONHASHSEED=str(hash_seed), PYTHONPATH=os.pathsep.join(filter(None, [ROOT, os.environ.get("PYTHONPATH")])))
+    python_path = os.pathsep.join(filter(None, [ROOT, os.environ.get("PYTHONPATH")]))
+    env = dict(os.environ, PYTHONHASHSEED=str(hash_seed), PYTHONPATH=python_path)
     env.pop("PREPARATOR_DATABASE", None)
     if database:
         env["PREPARATOR_DATABASE"] = database

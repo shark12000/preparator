@@ -586,7 +586,11 @@ def submit_answer():
         "INSERT INTO attempts (question_id, answer, score, created_at) VALUES (?, ?, ?, ?)",
         (question_id, answer, result["score"], now),
     )
+    existing = database.execute(
+        "SELECT pinned FROM weaknesses WHERE question_id = ?", (question_id,)
+    ).fetchone()
     if result["score"] < WEAK_SCORE_THRESHOLD:
+        queue_status = "still_weak" if existing else "added"
         database.execute(
             """INSERT INTO weaknesses (question_id, miss_count, last_score, updated_at)
                VALUES (?, 1, ?, ?)
@@ -595,7 +599,16 @@ def submit_answer():
                    updated_at = excluded.updated_at""",
             (question_id, result["score"], now),
         )
+    elif existing is None:
+        queue_status = "not_queued"
+    elif existing["pinned"]:
+        queue_status = "kept_pinned"
+        database.execute(
+            "UPDATE weaknesses SET last_score = ?, updated_at = ? WHERE question_id = ?",
+            (result["score"], now, question_id),
+        )
     else:
+        queue_status = "removed"
         database.execute(
             "DELETE FROM weaknesses WHERE question_id = ? AND pinned = 0", (question_id,)
         )
@@ -606,6 +619,7 @@ def submit_answer():
             "explanation": row["explanation"],
             "solution": row["solution"],
             "feedback_note": "Concept-match score: a transparent keyword rubric, not an AI judgment. Review the missed concepts below.",
+            "weak_queue": {"status": queue_status, "threshold": WEAK_SCORE_THRESHOLD},
         }
     )
 

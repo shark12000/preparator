@@ -277,6 +277,47 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(dashboard["weak_count"], 1)
         self.assertEqual(dashboard["attempts"], 1)
 
+    def _answer_with_score(self, question_id, score):
+        fake = {"score": score, "matched": [], "missed": [], "label": "stub"}
+        with mock.patch.object(preparator, "evaluate_answer", return_value=fake):
+            response = self.client.post(
+                "/api/answer", json={"question_id": question_id, "answer": "anything"}
+            )
+        self.assertEqual(response.status_code, 200)
+        return response.get_json()
+
+    def _first_question_id(self):
+        with preparator.app.app_context():
+            return preparator.get_db().execute("SELECT id FROM questions LIMIT 1").fetchone()[0]
+
+    def test_weak_queue_added_then_still_weak_then_removed(self):
+        qid = self._first_question_id()
+        body = self._answer_with_score(qid, 3)
+        self.assertEqual(body["weak_queue"], {"status": "added", "threshold": 7})
+        body = self._answer_with_score(qid, 4)
+        self.assertEqual(body["weak_queue"], {"status": "still_weak", "threshold": 7})
+        body = self._answer_with_score(qid, 9)
+        self.assertEqual(body["weak_queue"], {"status": "removed", "threshold": 7})
+        self.assertEqual(self.client.get("/api/dashboard").get_json()["weak_count"], 0)
+
+    def test_weak_queue_not_queued_on_pass_without_row(self):
+        body = self._answer_with_score(self._first_question_id(), 10)
+        self.assertEqual(body["weak_queue"], {"status": "not_queued", "threshold": 7})
+        self.assertEqual(body["score"], 10)
+
+    def test_pinned_question_keeps_row_and_updates_last_score_on_pass(self):
+        qid = self._first_question_id()
+        self.assertEqual(self.client.post(f"/api/weakness/{qid}", json={}).status_code, 200)
+        body = self._answer_with_score(qid, 3)
+        self.assertEqual(body["weak_queue"], {"status": "still_weak", "threshold": 7})
+        body = self._answer_with_score(qid, 10)
+        self.assertEqual(body["weak_queue"], {"status": "kept_pinned", "threshold": 7})
+        weak = self.client.get("/api/dashboard").get_json()["weak_questions"]
+        self.assertEqual(len(weak), 1)
+        self.assertEqual(weak[0]["last_score"], 10)
+        self.assertEqual(weak[0]["pinned"], 1)
+        self.assertEqual(weak[0]["miss_count"], 1)
+
     def test_theory_lesson_and_note_are_saved_and_exported(self):
         lessons = self.client.get("/api/theory").get_json()["lessons"]
         expected_lessons = sum(question["mode"] == "Theory" for question in preparator.QUESTION_BANK)
