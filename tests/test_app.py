@@ -395,7 +395,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(dashboard["attempts"], 1)
 
     def _answer_with_score(self, question_id, score):
-        fake = {"score": score, "matched": [], "missing": []}
+        fake = {"score": score, "matched": [], "missing": [], "concepts": []}
         with mock.patch.object(preparator, "evaluate_answer", return_value=fake):
             response = self.client.post(
                 "/api/answer", json={"question_id": question_id, "answer": "anything"}
@@ -885,7 +885,11 @@ class PreparatorTests(unittest.TestCase):
         self.addCleanup(preparator.app.config.__setitem__, "DATABASE", original)
         preparator.app.config["DATABASE"] = self._fresh_database_path()
         stderr = io.StringIO()
-        with mock.patch.object(preparator, "init_db", side_effect=RuntimeError("boom")),                 contextlib.redirect_stderr(stderr), self.assertRaises(RuntimeError) as caught:
+        with (
+            mock.patch.object(preparator, "init_db", side_effect=RuntimeError("boom")),
+            contextlib.redirect_stderr(stderr),
+            self.assertRaises(RuntimeError) as caught,
+        ):
             preparator.prepare_database()
         self.assertEqual(str(caught.exception), "boom")
         self.assertEqual(stderr.getvalue(), "")
@@ -904,10 +908,13 @@ class PreparatorTests(unittest.TestCase):
             with self.assertRaises(preparator.SchemaTooNewError):
                 self._run_init(path)
         self.assertIn("PRAGMA user_version", statements)
-        writes = ("INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "REPLACE",
-                  "PRAGMA USER_VERSION =")
+        writes = ("INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "REPLACE")
         for statement in statements:
-            self.assertFalse(statement.strip().upper().startswith(writes), statement)
+            normalized = " ".join(statement.upper().split())
+            self.assertFalse(normalized.startswith(writes), statement)
+            self.assertFalse(
+                normalized.replace(" ", "").startswith("PRAGMAUSER_VERSION="), statement
+            )
 
     def test_prepare_database_exits_on_newer_database_only(self):
         original = preparator.app.config["DATABASE"]
@@ -1451,7 +1458,10 @@ class PreparatorTests(unittest.TestCase):
     def test_question_response_never_includes_solution_explanation_or_criteria(self):
         # ARCHITECTURE.md guardrail: no solution before submission, for both modes and for the
         # specific-id path as well as the picker path.
-        forbidden = {"solution", "explanation", "criteria", "key_points", "example"}
+        forbidden = {
+            "solution", "explanation", "criteria", "key_points", "example",
+            "concepts", "looked_for", "related", "alternatives",
+        }
         for mode in ("Theory", "Coding"):
             qid = self._question_row(mode)
             for extra in ({"mode": mode}, {"question_id": qid}):

@@ -302,21 +302,66 @@ def strip_starter_code(answer, starter_code):
     return "\n".join(line for line in answer.splitlines() if line.strip() not in starter_lines)
 
 
+PARTIAL_CREDIT = 0.5
+
+
 def evaluate_answer(answer, criteria, starter_code=""):
+    """Heuristic rubric scoring (ADR-017): keywords > alternatives > related > none."""
     if starter_code:
         answer = strip_starter_code(answer, starter_code)
     normalized = re.sub(r"\s+", " ", answer.casefold())
+
+    def found(terms):
+        return [term for term in terms if re.search(keyword_pattern(term), normalized)]
+
     matched = []
     missing = []
-    for item in criteria:
-        if any(re.search(keyword_pattern(keyword), normalized) for keyword in item["keywords"]):
+    concepts = []
+    covered_count = 0
+    partial_count = 0
+    for index, item in enumerate(criteria):
+        keyword_hits = found(item["keywords"])
+        alternative_label = None
+        alternative_terms = []
+        for alternative in item.get("alternatives", []):
+            hits = found(alternative["keywords"])
+            alternative_terms.extend(hits)
+            if hits and alternative_label is None:
+                alternative_label = alternative["label"]
+        related_hits = found(item.get("related", []))
+        if keyword_hits:
+            state = "covered"
+        elif alternative_label is not None:
+            state = "covered"
+        elif related_hits:
+            state = "partial"
+        else:
+            state = "not_detected"
+        if state == "covered":
+            covered_count += 1
             matched.append(item["label"])
         else:
             missing.append(item["label"])
-    score = round(10 * len(matched) / len(criteria)) if criteria else 0
+            if state == "partial":
+                partial_count += 1
+        matched_terms = list(dict.fromkeys(keyword_hits + alternative_terms + related_hits))
+        concepts.append(
+            {
+                "index": index,
+                "label": item["label"],
+                "state": state,
+                "matched_terms": matched_terms,
+                "looked_for": list(item["keywords"]),
+                "alternative": alternative_label if not keyword_hits else None,
+            }
+        )
+    if criteria:
+        score = round(10 * (covered_count + PARTIAL_CREDIT * partial_count) / len(criteria))
+    else:
+        score = 0
     if answer.strip() and score == 0:
         score = 1
-    return {"score": score, "matched": matched, "missing": missing}
+    return {"score": score, "matched": matched, "missing": missing, "concepts": concepts}
 
 
 CODING_PLACEHOLDER = "# Write your Python solution below.\n"
@@ -623,6 +668,7 @@ def submit_answer():
     return jsonify(
         {
             **result,
+            "attempt_id": inserted.lastrowid,
             "explanation": row["explanation"],
             "solution": row["solution"],
             "feedback_note": "Concept-match score: a transparent keyword rubric, not an AI judgment. Review the missed concepts below.",
