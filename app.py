@@ -376,6 +376,13 @@ def dashboard():
                   ROUND(AVG(score), 1) AS average
            FROM attempts GROUP BY day ORDER BY day DESC LIMIT 30"""
     ).fetchall()
+    # The streak looks at every practice day, not just the 30 shown in the trend.
+    practice_days = [
+        row[0]
+        for row in database.execute(
+            "SELECT DISTINCT date(created_at, 'localtime') AS day FROM attempts ORDER BY day DESC"
+        )
+    ]
     return jsonify(
         {
             "attempts": totals["attempts"],
@@ -385,7 +392,7 @@ def dashboard():
             "topics": [dict(row) for row in topics],
             "matrix": [dict(row) for row in matrix],
             "trend": [dict(row) for row in reversed(daily)],
-            "streak": practice_streak([row["day"] for row in daily]),
+            "streak": practice_streak(practice_days),
             "weak_questions": [dict(row) for row in weak_questions],
             "recent": [dict(row) for row in recent],
         }

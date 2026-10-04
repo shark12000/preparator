@@ -69,6 +69,29 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(preparator.practice_streak(["2026-10-02", "2026-10-01"], today), 2)
         self.assertEqual(preparator.practice_streak(["2026-09-29"], today), 0)
 
+    def _insert_attempts_on_days_ago(self, offsets):
+        from datetime import date, datetime, time, timedelta, timezone
+        with preparator.app.app_context():
+            database = preparator.get_db()
+            qid = database.execute("SELECT id FROM questions WHERE retired = 0 LIMIT 1").fetchone()[0]
+            for offset in offsets:
+                local_noon = datetime.combine(date.today() - timedelta(days=offset), time(12)).astimezone()
+                database.execute(
+                    "INSERT INTO attempts (question_id, answer, score, created_at) VALUES (?, 'x', 5, ?)",
+                    (qid, local_noon.astimezone(timezone.utc).isoformat(timespec="seconds")),
+                )
+            database.commit()
+
+    def test_dashboard_streak_is_not_capped_at_thirty_days(self):
+        self._insert_attempts_on_days_ago(range(45))
+        dashboard = self.client.get("/api/dashboard").get_json()
+        self.assertEqual(dashboard["streak"], 45)
+        self.assertEqual(len(dashboard["trend"]), 30)
+
+    def test_dashboard_streak_anchors_on_yesterday_and_breaks_on_gap(self):
+        self._insert_attempts_on_days_ago([1, 2, 3, 5])
+        self.assertEqual(self.client.get("/api/dashboard").get_json()["streak"], 3)
+
     def test_dashboard_reports_trend_matrix_and_streak(self):
         with preparator.app.app_context():
             question_id = preparator.get_db().execute("SELECT id FROM questions LIMIT 1").fetchone()[0]
@@ -278,7 +301,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(dashboard["attempts"], 1)
 
     def _answer_with_score(self, question_id, score):
-        fake = {"score": score, "matched": [], "missed": [], "label": "stub"}
+        fake = {"score": score, "matched": [], "missing": []}
         with mock.patch.object(preparator, "evaluate_answer", return_value=fake):
             response = self.client.post(
                 "/api/answer", json={"question_id": question_id, "answer": "anything"}
@@ -288,7 +311,9 @@ class PreparatorTests(unittest.TestCase):
 
     def _first_question_id(self):
         with preparator.app.app_context():
-            return preparator.get_db().execute("SELECT id FROM questions LIMIT 1").fetchone()[0]
+            return preparator.get_db().execute(
+                "SELECT id FROM questions WHERE retired = 0 LIMIT 1"
+            ).fetchone()[0]
 
     def test_weak_queue_added_then_still_weak_then_removed(self):
         qid = self._first_question_id()
@@ -317,6 +342,23 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(weak[0]["last_score"], 10)
         self.assertEqual(weak[0]["pinned"], 1)
         self.assertEqual(weak[0]["miss_count"], 1)
+
+    def test_pinned_pass_updates_updated_at(self):
+        qid = self._first_question_id()
+        self.client.post(f"/api/weakness/{qid}", json={})
+        with preparator.app.app_context():
+            database = preparator.get_db()
+            database.execute(
+                "UPDATE weaknesses SET updated_at = '2000-01-01T00:00:00+00:00' WHERE question_id = ?",
+                (qid,),
+            )
+            database.commit()
+        self._answer_with_score(qid, 10)
+        with preparator.app.app_context():
+            updated = preparator.get_db().execute(
+                "SELECT updated_at FROM weaknesses WHERE question_id = ?", (qid,)
+            ).fetchone()[0]
+        self.assertGreater(updated, "2000-01-01T00:00:00+00:00")
 
     def test_theory_lesson_and_note_are_saved_and_exported(self):
         lessons = self.client.get("/api/theory").get_json()["lessons"]
