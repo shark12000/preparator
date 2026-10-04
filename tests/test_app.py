@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from datetime import date, datetime, time, timedelta, timezone
 from unittest import mock
 import app as preparator
 
@@ -69,13 +70,12 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(preparator.practice_streak(["2026-10-02", "2026-10-01"], today), 2)
         self.assertEqual(preparator.practice_streak(["2026-09-29"], today), 0)
 
-    def _insert_attempts_on_days_ago(self, offsets):
-        from datetime import date, datetime, time, timedelta, timezone
+    def _insert_attempts_on_days_ago(self, offsets, at=None):
         with preparator.app.app_context():
             database = preparator.get_db()
             qid = database.execute("SELECT id FROM questions WHERE retired = 0 LIMIT 1").fetchone()[0]
             for offset in offsets:
-                local_noon = datetime.combine(date.today() - timedelta(days=offset), time(12)).astimezone()
+                local_noon = datetime.combine(date.today() - timedelta(days=offset), at or time(12)).astimezone()
                 database.execute(
                     "INSERT INTO attempts (question_id, answer, score, created_at) VALUES (?, 'x', 5, ?)",
                     (qid, local_noon.astimezone(timezone.utc).isoformat(timespec="seconds")),
@@ -87,6 +87,18 @@ class PreparatorTests(unittest.TestCase):
         dashboard = self.client.get("/api/dashboard").get_json()
         self.assertEqual(dashboard["streak"], 45)
         self.assertEqual(len(dashboard["trend"]), 30)
+
+    @unittest.skipIf(
+        datetime.now().astimezone().utcoffset() <= timedelta(0),
+        "needs a local zone ahead of UTC: only there does 00:30 local fall on the previous UTC day",
+    )
+    def test_dashboard_streak_uses_local_day_for_attempts_just_after_midnight(self):
+        # Today 00:30 local is yesterday in UTC, so without 'localtime' it merges with yesterday noon
+        # (also yesterday in UTC) and the streak drops to 1. On UTC or behind-UTC machines the test cannot
+        # tell the difference, so it is skipped there instead of giving false assurance.
+        self._insert_attempts_on_days_ago([0], at=time(0, 30))
+        self._insert_attempts_on_days_ago([1])
+        self.assertEqual(self.client.get("/api/dashboard").get_json()["streak"], 2)
 
     def test_dashboard_streak_anchors_on_yesterday_and_breaks_on_gap(self):
         self._insert_attempts_on_days_ago([1, 2, 3, 5])
@@ -251,16 +263,58 @@ class PreparatorTests(unittest.TestCase):
             response.get_json()["question"]["starter_code"], "# Write your Python solution below.\n"
         )
 
-    def test_every_foundations_coding_item_has_starter_code(self):
-        coding = [
-            question for question in preparator.QUESTION_BANK
-            if question["difficulty"] == "Foundations" and question["mode"] == "Coding"
-        ]
+    def test_every_coding_item_has_starter_code(self):
+        coding = [question for question in preparator.QUESTION_BANK if question["mode"] == "Coding"]
         self.assertGreater(len(coding), 0)
         for question in coding:
             with self.subTest(prompt=question["prompt"]):
                 self.assertTrue(question.get("starter_code", "").strip())
                 self.assertNotEqual(question["starter_code"].strip(), question["solution"].strip())
+
+    def test_coding_starters_are_bare_stubs_matching_the_solution(self):
+        import ast
+
+        def is_docstring(node):
+            return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
+
+        def signature_names(source, check_bare):
+            """Top-level def/class names plus class method names, in order. Optionally assert stub shape."""
+            tree = ast.parse(source)
+            names = []
+            for node in tree.body:
+                if is_docstring(node) and node is tree.body[0]:
+                    continue
+                if check_bare:
+                    self.assertIsInstance(node, (ast.FunctionDef, ast.ClassDef))
+                elif not isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                    continue  # solutions may import or define constants; only starters must be bare
+                names.append(node.name)
+                if isinstance(node, ast.FunctionDef):
+                    if check_bare:
+                        self.assertEqual(len(node.body), 1)
+                        self.assertIsInstance(node.body[0], ast.Pass)
+                    continue
+                for member in node.body:
+                    if check_bare and is_docstring(member) and member is node.body[0]:
+                        continue
+                    if check_bare:
+                        self.assertIsInstance(member, ast.FunctionDef)
+                    elif not isinstance(member, ast.FunctionDef):
+                        continue
+                    names.append(f"{node.name}.{member.name}")
+                    if check_bare:
+                        self.assertEqual(len(member.body), 1)
+                        self.assertIsInstance(member.body[0], ast.Pass)
+            return names
+
+        for question in preparator.QUESTION_BANK:
+            if question["mode"] != "Coding":
+                continue
+            with self.subTest(prompt=question["prompt"]):
+                self.assertEqual(
+                    signature_names(question["starter_code"], True),
+                    signature_names(question["solution"], False),
+                )
 
     def test_dashboard_reports_canonical_bank_count(self):
         response = self.client.get("/api/dashboard")

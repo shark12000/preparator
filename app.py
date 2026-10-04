@@ -380,7 +380,7 @@ def dashboard():
     practice_days = [
         row[0]
         for row in database.execute(
-            "SELECT DISTINCT date(created_at, 'localtime') AS day FROM attempts ORDER BY day DESC"
+            "SELECT DISTINCT date(created_at, 'localtime') AS day FROM attempts"
         )
     ]
     return jsonify(
@@ -399,10 +399,10 @@ def dashboard():
     )
 
 
-def practice_streak(days_descending, today=None):
+def practice_streak(practice_days, today=None):
     """Count consecutive practice days ending today (or yesterday, if today is still open)."""
     today = today or date.today()
-    practiced = {date.fromisoformat(day) for day in days_descending}
+    practiced = {date.fromisoformat(day) for day in practice_days}
     cursor = today if today in practiced else today - timedelta(days=1)
     streak = 0
     while cursor in practiced:

@@ -69,6 +69,7 @@ QUESTION_BANK = [
         ],
         "explanation": "A stack captures the last unmatched opening bracket, which must pair with the next closing bracket. Reject a closer when the stack is empty or its opener does not match. At the end, the stack must be empty. The scan is O(n) time and O(n) worst-case space.",
         "solution": "def is_balanced(text: str) -> bool:\n    pairs = {')': '(', ']': '[', '}': '{'}\n    stack = []\n    for char in text:\n        if char in '([{':\n            stack.append(char)\n        elif char in pairs:\n            if not stack or stack.pop() != pairs[char]:\n                return False\n    return not stack",
+        "starter_code": "def is_balanced(text: str) -> bool:\n    pass",
     },
     {
         "topic": "Data Structures",
@@ -82,6 +83,7 @@ QUESTION_BANK = [
         ],
         "explanation": "The cache needs fast key lookup and fast updates to recency order. A hash map plus a doubly linked list achieves O(1) operations; Python's OrderedDict packages both behaviors. Reads and writes move a key to the newest end, and inserting beyond capacity evicts the oldest entry.",
         "solution": "from collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        self.capacity = capacity\n        self.items = OrderedDict()\n\n    def get(self, key):\n        if key not in self.items:\n            return -1\n        self.items.move_to_end(key)\n        return self.items[key]\n\n    def put(self, key, value):\n        self.items[key] = value\n        self.items.move_to_end(key)\n        if len(self.items) > self.capacity:\n            self.items.popitem(last=False)",
+        "starter_code": "class LRUCache:\n    def __init__(self, capacity: int):\n        pass\n\n    def get(self, key):\n        pass\n\n    def put(self, key, value):\n        pass",
     },
     {
         "topic": "Functions & Objects",
@@ -254,6 +256,7 @@ QUESTION_BANK = [
         ],
         "explanation": "Because the input is sorted, each comparison discards half the remaining candidates. Maintain inclusive left and right bounds, calculate a midpoint, and move one bound past it. The loop ends when the target is found or the interval is empty. Time is O(log n); extra space is O(1).",
         "solution": "def binary_search(values: list[int], target: int) -> int:\n    left, right = 0, len(values) - 1\n    while left <= right:\n        middle = (left + right) // 2\n        if values[middle] == target:\n            return middle\n        if values[middle] < target:\n            left = middle + 1\n        else:\n            right = middle - 1\n    return -1",
+        "starter_code": "def binary_search(values: list[int], target: int) -> int:\n    pass",
     },
     {
         "topic": "Data Structures",
@@ -267,6 +270,7 @@ QUESTION_BANK = [
         ],
         "explanation": "With one missing value and no duplicates, n is len(values) + 1. The expected sum is n(n+1)/2, so subtracting the observed sum yields the missing number. This runs in O(n) time and O(1) auxiliary space; the input constraints are essential to the reasoning.",
         "solution": "def missing_number(values: list[int]) -> int:\n    n = len(values) + 1\n    return n * (n + 1) // 2 - sum(values)",
+        "starter_code": "def missing_number(values: list[int]) -> int:\n    pass",
     },
     {
         "topic": "Data Structures",
@@ -280,6 +284,7 @@ QUESTION_BANK = [
         ],
         "explanation": "A Counter provides frequency lookup. Iterating its keys preserves first-seen insertion order, and max with the count as its key returns the first maximum when counts tie. Check for an empty Counter before calling max. The implementation takes O(n) expected time and O(k) space for k distinct values.",
         "solution": "from collections import Counter\n\ndef most_frequent(values):\n    counts = Counter(values)\n    return max(counts, key=counts.get) if counts else None",
+        "starter_code": "def most_frequent(values):\n    pass",
     },
     {
         "topic": "Python Core",
@@ -332,6 +337,7 @@ QUESTION_BANK = [
         ],
         "explanation": "Let ways[a] count combinations that make amount a. There is one way to make zero: choose no coins. For each coin, update totals from that coin upward using ways[a - coin]. Keeping the coin loop outermost counts combinations without treating different coin orders as distinct. Complexity is O(number of coins × amount) time and O(amount) space.",
         "solution": "def count_change(coins: list[int], amount: int) -> int:\n    ways = [0] * (amount + 1)\n    ways[0] = 1\n    for coin in coins:\n        for subtotal in range(coin, amount + 1):\n            ways[subtotal] += ways[subtotal - coin]\n    return ways[amount]",
+        "starter_code": "def count_change(coins: list[int], amount: int) -> int:\n    pass",
     },
     {
         "topic": "Data Structures",
@@ -345,6 +351,7 @@ QUESTION_BANK = [
         ],
         "explanation": "Define reachable[i] to mean the prefix before i can be segmented. Start with reachable[0] = True. For each end position, look for a prior reachable boundary whose intervening substring is a dictionary word. The final state answers the question. This dynamic program uses O(n) states and O(n²) candidate substrings, ignoring substring/hash costs.",
         "solution": "def can_segment(text: str, words: set[str]) -> bool:\n    reachable = [False] * (len(text) + 1)\n    reachable[0] = True\n    for end in range(1, len(text) + 1):\n        for start in range(end):\n            if reachable[start] and text[start:end] in words:\n                reachable[end] = True\n                break\n    return reachable[-1]",
+        "starter_code": "def can_segment(text: str, words: set[str]) -> bool:\n    pass",
     },
     {
         "topic": "Data Structures",
@@ -358,6 +365,7 @@ QUESTION_BANK = [
         ],
         "explanation": "At each day, the best sale is the current price minus the lowest price seen earlier. Update the best profit, then update the running minimum. This ordering prevents buying and selling on the same day. Return zero for fewer than two prices or when every trade would lose money. The scan is O(n) time and O(1) space.",
         "solution": "def max_single_trade_profit(prices: list[int]) -> int:\n    lowest = float('inf')\n    best = 0\n    for price in prices:\n        best = max(best, price - lowest)\n        lowest = min(lowest, price)\n    return best",
+        "starter_code": "def max_single_trade_profit(prices: list[int]) -> int:\n    pass",
     },
 ]
 
