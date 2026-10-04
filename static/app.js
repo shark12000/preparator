@@ -47,11 +47,45 @@ const storage = {
   set(key, value) { try { localStorage.setItem(key, value); } catch (_error) { /* storage unavailable */ } },
 };
 
+const NETWORK_ERROR_MESSAGE = "Could not reach the app. Check that it is still running, then try again.";
+const SERVER_ERROR_MESSAGE = "Something went wrong. Try again.";
+
+class RequestError extends Error {
+  constructor(message, kind, status) {
+    super(message);
+    this.name = "RequestError";
+    this.kind = kind; // "network" | "server"
+    this.status = status; // HTTP status, 0 for network
+  }
+}
+
+async function request(url, options = {}) {
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (error) {
+    if (error && error.name === "AbortError") throw error;
+    if (error instanceof TypeError) throw new RequestError(NETWORK_ERROR_MESSAGE, "network", 0);
+    throw error;
+  }
+  if (response.ok) return response;
+  const data = await response.json().catch(() => null);
+  const message = data && typeof data.error === "string" && data.error ? data.error : SERVER_ERROR_MESSAGE;
+  throw new RequestError(message, "server", response.status);
+}
+
 async function requestJson(url, options = {}) {
-  const response = await fetch(url, options);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Request failed.");
-  return data;
+  const response = await request(url, options);
+  return response.json().catch(() => ({}));
+}
+
+async function requestBlob(url, options = {}) {
+  const response = await request(url, options);
+  try {
+    return await response.blob();
+  } catch (_error) {
+    throw new RequestError(NETWORK_ERROR_MESSAGE, "network", 0);
+  }
 }
 const postJson = (url, body) => requestJson(url, {
   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}),
