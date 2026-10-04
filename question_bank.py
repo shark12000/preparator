@@ -156,12 +156,30 @@ QUESTION_BANK = [
         "mode": "Theory",
         "prompt": "What happens when a dictionary key is missing, and how can you handle an optional key safely?",
         "criteria": [
-            {"label": "Indexing raises KeyError", "keywords": ["keyerror", "raises", "exception"]},
-            {"label": "Uses get or membership for expected absence", "keywords": [".get(", " in ", "membership", "default"]},
-            {"label": "Distinguishes absent keys from stored None when needed", "keywords": ["none", "sentinel", "in operator", "stored value"]},
+            {
+                "label": "Indexing a missing key raises KeyError",
+                "keywords": ["keyerror", "raises", "raise", "exception"],
+                "related": ["bracket", "square bracket", "[key]", "error", "fails", "crash"],
+            },
+            {
+                "label": "Handles absence with get, membership or try/except",
+                "keywords": [".get(", " in ", "membership", "default"],
+                "alternatives": [
+                    {
+                        "label": "Handles the error with try/except KeyError (EAFP)",
+                        "keywords": ["try/except", "try-except", "try / except", "except keyerror", "try:", "eafp"],
+                    }
+                ],
+                "related": ["get method", "get()", "check if the key", "check whether the key"],
+            },
+            {
+                "label": "Distinguishes absent keys from stored None when needed",
+                "keywords": ["none", "sentinel", "in operator", "stored value"],
+                "related": ["null", "falsy", "marker value"],
+            },
         ],
-        "explanation": "Mapping[key] is appropriate when a missing key is exceptional; otherwise it raises KeyError. For ordinary optional lookups, use get(key, default) or test membership. If None is a valid stored value, membership or a unique sentinel distinguishes a missing key from a key explicitly mapped to None.",
-        "solution": "Indexing a missing key raises KeyError. For an optional key use settings.get('timeout', default) or the in operator. If None can be a stored value, use a unique sentinel to tell an absent key from a stored None:\n\nMISSING = object()\nvalue = settings.get('timeout', MISSING)\nif value is MISSING:\n    value = 30",
+        "explanation": "Mapping[key] is appropriate when a missing key is exceptional; otherwise it raises KeyError. There are two styles for optional lookups. Look before you leap (LBYL): use get(key, default) or test membership with in, which fits when absence is common. Easier to ask forgiveness than permission (EAFP): wrap the lookup in try: ... except KeyError:, which fits when the key is usually present or when the lookup and the handling belong together. If None is a valid stored value, membership or a unique sentinel distinguishes a missing key from a key explicitly mapped to None.",
+        "solution": "Indexing a missing key raises KeyError. For an optional key use settings.get('timeout', default) or the in operator (look before you leap), or catch the error with try: ... except KeyError: (EAFP, easier to ask forgiveness than permission). If None can be a stored value, use a unique sentinel to tell an absent key from a stored None:\n\nMISSING = object()\nvalue = settings.get('timeout', MISSING)\nif value is MISSING:\n    value = 30",
     },
     {
         "topic": "Data Structures",

@@ -39,6 +39,36 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(result["matched"], ["mutability"])
         self.assertEqual(result["missing"], ["hashing"])
 
+    DICT_PROMPT = "What happens when a dictionary key is missing, and how can you handle an optional key safely?"
+
+    def _dict_criteria(self):
+        from question_bank import QUESTION_BANK
+        return next(q for q in QUESTION_BANK if q["prompt"] == self.DICT_PROMPT)["criteria"]
+
+    def test_dict_missing_key_real_answer_earns_partial_and_eafp(self):
+        result = preparator.evaluate_answer(
+            "You are not able to access it with bracket notation. Use try/except to catch the error.",
+            self._dict_criteria(),
+        )
+        states = [c["state"] for c in result["concepts"]]
+        self.assertEqual(states[0], "partial")
+        self.assertEqual(states[1], "covered")
+        self.assertEqual(result["concepts"][1]["alternative"], "Handles the error with try/except KeyError (EAFP)")
+        self.assertGreaterEqual(result["score"], 5)
+
+    def test_dict_missing_key_full_answer_still_scores_ten(self):
+        result = preparator.evaluate_answer(
+            "It raises KeyError; use .get(key, default). Use a sentinel for stored values.",
+            self._dict_criteria(),
+        )
+        self.assertEqual(result["score"], 10)
+        self.assertEqual([c["state"] for c in result["concepts"]], ["covered"] * 3)
+
+    def test_dict_missing_key_bare_exception_does_not_trigger_eafp(self):
+        result = preparator.evaluate_answer("exception", self._dict_criteria())
+        self.assertNotEqual(result["concepts"][1]["state"], "covered")
+        self.assertIsNone(result["concepts"][1]["alternative"])
+
     def test_keywords_match_at_word_starts_only(self):
         criteria = [{"label": "counting", "keywords": ["count"]}]
         self.assertEqual(preparator.evaluate_answer("Check the account.", criteria)["matched"], [])
@@ -1498,6 +1528,8 @@ class PreparatorTests(unittest.TestCase):
                 self.assertEqual(body["solution"], row["solution"])
                 self.assertEqual(body["explanation"], row["explanation"])
                 self.assertTrue({"score", "matched", "missing", "weak_queue"} <= set(body))
+                self.assertIsInstance(body["concepts"], list)
+                self.assertTrue(body["concepts"])
 
     def test_pin_creates_unmissed_pinned_row(self):
         qid = self._first_question_id()
