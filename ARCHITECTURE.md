@@ -16,14 +16,16 @@ Preparator is a local, single-process Flask application. Flask serves one HTML p
 - `static/style.css` defines design tokens (colors, type scale) for light and dark themes, then components and responsive layouts. Use tokens rather than raw hex values.
 - `tests/test_app.py` exercises API behavior with an isolated temporary SQLite database.
 - `instance/preparator.sqlite3` is the local persistent database. Do not use it as a test database.
-- `requirements.txt` lists the Python runtime dependency. `.vscode/tasks.json` provides the local run task.
+- `requirements.txt` lists the Python runtime dependency; `requirements-dev.txt` lists development-only tools (Playwright for the browser checks in `tools/qa/`). `.vscode/tasks.json` provides the local run task.
 
 ## Data Model
 
-- `questions` stores prompts, topic, difficulty, mode, answer criteria, explanations, examples, and optional starter code. `init_db()` runs lazily on the first connection to each database file. It inserts new prompts from `QUESTION_BANK` and refreshes criteria, explanation, solution, and starter code on existing rows (matched by topic, difficulty, mode, and prompt), so editing a prompt's text creates a new row while editing its content updates in place. Existing databases gain `starter_code` with a small additive migration.
+- `questions` stores prompts, topic, difficulty, mode, answer criteria, explanations, examples, optional starter code, and a `retired` flag. `init_db()` runs once per database file per process, on the first connection (ADR-003). In one transaction it applies pending schema migrations and then seeds: it inserts new prompts from `QUESTION_BANK` and refreshes criteria, explanation, solution, and starter code on existing rows (matched by topic, difficulty, mode, and prompt), so editing a prompt's text creates a new row while editing its content updates in place. Rows whose identity is no longer in the bank are marked `retired` (ADR-005): they are never served or listed, but they are kept so user history stays attached.
 - `attempts` stores each submitted answer, rubric score, and timestamp.
 - `weaknesses` tracks questions to revisit, including misses and user-pinned items.
-- `saved_lessons` stores saved theory question IDs, personal notes, and save timestamps.
+- `saved_lessons` stores theory question IDs with a personal note, a `saved` flag, and a save timestamp. Unsaving a lesson clears the flag and keeps a non-empty note (ADR-004).
+
+Schema changes go through the versioned migrations in `app.py` (`MIGRATIONS`, tracked in `PRAGMA user_version`, ADR-003). Steps are additive only: new tables, new columns with defaults, new indexes; they never rewrite or drop user data.
 
 The question bank is currently the source of truth for lesson and interview content. Duplicate question rows from older development reloads are filtered by canonical prompt identity when selecting or listing questions.
 
@@ -54,7 +56,7 @@ python app.py
 python -m unittest discover -s tests
 ```
 
-The default URL is `http://127.0.0.1:5000`. `PORT` changes the listen port; `PREPARATOR_DATABASE` changes the SQLite file path. The Flask development server runs with debug mode and is intended for local practice only.
+The default URL is `http://127.0.0.1:5000`. `PORT` changes the listen port; `PREPARATOR_DATABASE` changes the SQLite file path. The Flask development server is intended for local practice only. Debug mode (reloader and interactive debugger) is off unless `FLASK_DEBUG=1` is set (TASK-010); never enable it when anything other than you can reach the port.
 
 ## Agent Guardrails
 
@@ -76,7 +78,7 @@ Keep the current structure while the app remains small. As features grow, refact
 4. Add direct Sheets sync only behind a dedicated integration boundary with explicit authorization; retain CSV export as a credential-free fallback.
 5. Add authentication, CSRF protection, and a production WSGI server before exposing the app beyond localhost.
 
-Status of step 1 (ADR-003): the versioned migration mechanism (`PRAGMA user_version`) is planned now, inside `app.py`. Moving the database code into its own module is deferred until `app.py` passes about 600 lines; that move needs the agent ownership table in `CLAUDE.md` updated first.
+Status of step 1 (ADR-003): the versioned migration mechanism (`PRAGMA user_version`) is implemented inside `app.py` (TASK-007; schema version 3 after TASK-008 and TASK-012). Moving the database code into its own module was deferred until `app.py` passes about 600 lines; it is now about 630 lines, so the trigger is reached and the move is on the lead's open-items list. That move needs the agent ownership table in `CLAUDE.md` updated first.
 
 ## Architecture Decisions
 
