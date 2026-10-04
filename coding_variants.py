@@ -637,7 +637,7 @@ CODING_ARCHETYPES = [
         "criteria": [
             {"label": "Counts occurrences", "keywords": ["counter", "count", "frequency"]},
             {"label": "Defines deterministic tie order", "keywords": ["first", "stable", "order", "tie"]},
-            {"label": "Returns exactly k values", "keywords": ["[:k]", "[:k]", "k values"]},
+            {"label": "Returns exactly k values", "keywords": ["[:k]", "k values"]},
         ],
         "explanation": "Count each value, then sort distinct values by descending count and first-seen position. Explicitly encoding the tie-break makes output deterministic. This simple implementation is O(n + u log u) for u distinct values, with O(u) extra space.",
         "solution": "from collections import Counter\n\ndef top_k_frequent(values, k):\n    counts = Counter(values)\n    first_seen = {value: index for index, value in reversed(list(enumerate(values)))}\n    return sorted(counts, key=lambda value: (-counts[value], first_seen[value]))[:k]",

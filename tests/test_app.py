@@ -1,6 +1,9 @@
+import csv
+import io
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import threading
@@ -1362,8 +1365,28 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(ok.status_code, 200)
         self.assertEqual(len(self._note(qid)), 4000)
         too_long = self.client.post(f"/api/theory/{qid}", json={"note": "m" * 4001})
-        self._assert_error(too_long, 400, "Notes must be text shorter than 4,000 characters.")
+        self._assert_error(too_long, 400, "Notes must be text of 4,000 characters or fewer.")
         self.assertEqual(self._note(qid), "n" * 4000)
+
+    def test_importing_app_with_database_env_does_not_create_instance_dir(self):
+        # Spy on os.makedirs in a fresh interpreter before importing app; with
+        # PREPARATOR_DATABASE set, app must not create any directory at import.
+        with tempfile.TemporaryDirectory() as work:
+            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            env = dict(os.environ, PREPARATOR_DATABASE=os.path.join(work, "x.sqlite3"))
+            code = (
+                "import os, sys\n"
+                "calls = []\n"
+                "real = os.makedirs\n"
+                "os.makedirs = lambda *a, **k: (calls.append(a[0]), real(*a, **k))[1]\n"
+                f"sys.path.insert(0, {root!r})\n"
+                "import app\n"
+                "assert not calls, calls\n"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", code], cwd=work, env=env, capture_output=True, text=True
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_csv_export_header_bom_and_filename(self):
         qid = self._theory_id()
@@ -1379,9 +1402,6 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(lines[0], "Topic,Level,Theory,Explanation,Example,My notes,Saved at")
 
     def test_csv_export_neutralizes_every_formula_prefix(self):
-        import csv
-        import io
-
         qid = self._theory_id()
         for prefix in ("=", "+", "-", "@", "\t", "\r"):
             with self.subTest(prefix=repr(prefix)):
@@ -1419,6 +1439,7 @@ class PreparatorTests(unittest.TestCase):
                 "SELECT topic, difficulty, mode FROM questions WHERE retired = 0 "
                 "GROUP BY topic, difficulty, mode HAVING COUNT(*) BETWEEN 2 AND 6 LIMIT 1"
             ).fetchone()
+            self.assertIsNotNone(group)
             ids = [r[0] for r in database.execute(
                 "SELECT id FROM questions WHERE retired = 0 AND topic = ? AND difficulty = ? AND mode = ? "
                 "ORDER BY id", tuple(group))]

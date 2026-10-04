@@ -18,7 +18,8 @@ app.config["DATABASE"] = os.environ.get(
     "PREPARATOR_DATABASE", os.path.join(app.instance_path, "preparator.sqlite3")
 )
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024
-os.makedirs(app.instance_path, exist_ok=True)
+if "PREPARATOR_DATABASE" not in os.environ:
+    os.makedirs(app.instance_path, exist_ok=True)
 
 ALLOWED_HOSTNAMES = {"127.0.0.1", "localhost"}
 
@@ -439,7 +440,7 @@ def save_theory_lesson(question_id):
         return jsonify({"error": "Include a note (it may be empty)."}), 400
     note = data["note"]
     if not isinstance(note, str) or len(note) > 4000:
-        return jsonify({"error": "Notes must be text shorter than 4,000 characters."}), 400
+        return jsonify({"error": "Notes must be text of 4,000 characters or fewer."}), 400
     database = get_db()
     lesson = database.execute(
         "SELECT id FROM questions WHERE id = ? AND mode = 'Theory'", (question_id,)
