@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import tempfile
@@ -136,7 +137,6 @@ class PreparatorTests(unittest.TestCase):
         self.assertGreater(len(served), 0)
         for question in served:
             with self.subTest(prompt=question["prompt"]):
-                self.assertEqual(question["mode"], "Coding")
                 self.assertTrue(question["starter_code"].startswith("def "))
         response = self.client.post(
             "/api/question",
@@ -150,6 +150,83 @@ class PreparatorTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["question"]["mode"], "Coding")
+        self.assertTrue(response.get_json()["question"]["starter_code"].startswith("def "))
+
+    def _placeholder_question(self, criteria=None):
+        """A Coding row with no stored starter (relies on the placeholder).
+
+        Optionally replaces its criteria. Targets the exact row it blanked.
+        """
+        with preparator.app.app_context():
+            database = preparator.get_db()
+            question_id = database.execute(
+                "SELECT id FROM questions WHERE mode = 'Coding' AND retired = 0 LIMIT 1"
+            ).fetchone()["id"]
+            database.execute("UPDATE questions SET starter_code = '' WHERE id = ?", (question_id,))
+            if criteria is not None:
+                database.execute(
+                    "UPDATE questions SET criteria = ? WHERE id = ?",
+                    (json.dumps(criteria), question_id),
+                )
+            database.commit()
+            return database.execute(
+                "SELECT id, criteria FROM questions WHERE id = ?", (question_id,)
+            ).fetchone()
+
+    def test_unchanged_placeholder_is_rejected_and_records_nothing(self):
+        row = self._placeholder_question()
+        for answer in (
+            "# Write your Python solution below.",
+            "# Write your Python solution below.\n",
+            "  \n# Write your Python solution below.\n\n  ",
+        ):
+            with self.subTest(answer=answer):
+                response = self.client.post(
+                    "/api/answer", json={"question_id": row["id"], "answer": answer}
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(
+                    response.get_json()["error"],
+                    "Replace the starter stub with your solution before submitting.",
+                )
+        with preparator.app.app_context():
+            database = preparator.get_db()
+            self.assertEqual(database.execute("SELECT COUNT(*) FROM attempts").fetchone()[0], 0)
+            self.assertEqual(database.execute("SELECT COUNT(*) FROM weaknesses").fetchone()[0], 0)
+
+    def test_placeholder_line_earns_no_credit_alongside_real_code(self):
+        criteria = [{"label": "placeholder words", "keywords": ["write", "python", "solution"]}]
+        row = self._placeholder_question(criteria)
+        placeholder = "# Write your Python solution below."
+        self.assertEqual(
+            preparator.evaluate_answer(placeholder + "\nx = 1", criteria)["matched"],
+            ["placeholder words"],
+        )
+        response = self.client.post(
+            "/api/answer",
+            json={"question_id": row["id"], "answer": placeholder + "\nx = 1"},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["matched"], [])
+        self.assertEqual(body["missing"], ["placeholder words"])
+        self.assertEqual(body["score"], 1)
+
+    def test_question_endpoint_still_returns_placeholder_starter(self):
+        row = self._placeholder_question()
+        response = self.client.post(
+            "/api/question",
+            json={
+                "question_id": row["id"],
+                "source_confirmed": True,
+                "source_url": "https://www.google.com/search?q=Python+coding+questions",
+                "search_query": "Python coding questions",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json()["question"]["starter_code"], "# Write your Python solution below.\n"
+        )
 
     def test_every_foundations_coding_item_has_starter_code(self):
         coding = [

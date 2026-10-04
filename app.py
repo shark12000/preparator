@@ -307,6 +307,16 @@ def evaluate_answer(answer, criteria, starter_code=""):
     return {"score": score, "matched": matched, "missing": missing}
 
 
+CODING_PLACEHOLDER = "# Write your Python solution below.\n"
+
+
+def effective_starter(row):
+    """Starter shown to the user: stored code, else the Coding placeholder, else empty."""
+    if row["starter_code"]:
+        return row["starter_code"]
+    return CODING_PLACEHOLDER if row["mode"] == "Coding" else ""
+
+
 def question_dict(row):
     return {
         "id": row["id"],
@@ -314,9 +324,7 @@ def question_dict(row):
         "difficulty": row["difficulty"],
         "mode": row["mode"],
         "prompt": row["prompt"],
-        "starter_code": row["starter_code"] or (
-            "# Write your Python solution below.\n" if row["mode"] == "Coding" else ""
-        ),
+        "starter_code": effective_starter(row),
     }
 
 
@@ -569,9 +577,10 @@ def submit_answer():
         row = database.execute("SELECT * FROM questions WHERE id = ?", (question_id,)).fetchone()
     if row is None:
         return jsonify({"error": "Question not found."}), 404
-    if row["starter_code"] and answer == row["starter_code"].strip():
+    starter = effective_starter(row)
+    if starter and answer == starter.strip():
         return jsonify({"error": "Replace the starter stub with your solution before submitting."}), 400
-    result = evaluate_answer(answer, json.loads(row["criteria"]), row["starter_code"])
+    result = evaluate_answer(answer, json.loads(row["criteria"]), starter)
     now = utc_now()
     database.execute(
         "INSERT INTO attempts (question_id, answer, score, created_at) VALUES (?, ?, ?, ?)",

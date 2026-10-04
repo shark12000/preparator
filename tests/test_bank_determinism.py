@@ -30,7 +30,7 @@ print(total, active)
 
 
 def run_python(script, hash_seed, database=None):
-    env = dict(os.environ, PYTHONHASHSEED=str(hash_seed))
+    env = dict(os.environ, PYTHONHASHSEED=str(hash_seed), PYTHONPATH=os.pathsep.join(filter(None, [ROOT, os.environ.get("PYTHONPATH")])))
     env.pop("PREPARATOR_DATABASE", None)
     if database:
         env["PREPARATOR_DATABASE"] = database
@@ -40,7 +40,7 @@ def run_python(script, hash_seed, database=None):
     )
     if result.returncode != 0:
         raise AssertionError(result.stderr)
-    return result.stdout.split("\n")[:-1]
+    return result.stdout.splitlines()
 
 
 class BankDeterminismTests(unittest.TestCase):
