@@ -78,7 +78,7 @@ Keep the current structure while the app remains small. As features grow, refact
 4. Add direct Sheets sync only behind a dedicated integration boundary with explicit authorization; retain CSV export as a credential-free fallback.
 5. Add authentication, CSRF protection, and a production WSGI server before exposing the app beyond localhost.
 
-Status of step 1 (ADR-003): the versioned migration mechanism (`PRAGMA user_version`) is implemented inside `app.py` (TASK-007; schema version 3 after TASK-008 and TASK-012). Moving the database code into its own module was deferred until `app.py` passes about 600 lines; at 662 lines the trigger is reached. ADR-015 decides the move: connection, migration and seeding code goes to a new `db.py`, behavior unchanged (TASK-051, after TASK-024, 049 and 050). It waits for `db.py` to be added to the backend row of the `CLAUDE.md` write-areas table. Steps 2 and 3 are not started; revisit step 2 when the backup import (ADR-010) is designed in detail.
+Status of step 1 (ADR-003): the versioned migration mechanism (`PRAGMA user_version`) is implemented inside `app.py` (TASK-007; schema version 3 after TASK-008 and TASK-012). Moving the database code into its own module was deferred until `app.py` passes about 600 lines; at 663 lines the trigger is reached. ADR-015 decides the move: connection, migration and seeding code goes to a new `db.py`, behavior unchanged (TASK-051, after TASK-049 and TASK-050; TASK-024 has landed). It waits for `db.py` to be added to the backend row of the `CLAUDE.md` write-areas table. Steps 2 and 3 are not started; revisit step 2 when the backup import (ADR-010) is designed in detail.
 
 ## Architecture Decisions
 
@@ -98,7 +98,7 @@ Decisions are recorded in `docs/architecture/adr/`. Planned API changes are in `
 | ADR-010 | Progress backup format and import validation rules | Accepted (not yet implemented) |
 | ADR-011 | Answer drafts in localStorage; read-only, solution-free attempt history | Accepted (not yet implemented) |
 | ADR-012 | Resume an unfinished question after reload, through the search gate | Accepted (not yet implemented; needs a design addendum) |
-| ADR-013 | Open items from the Learn and Practice designs (notes, weak-spot removal, export, copy) | Accepted (TASK-049, TASK-050) |
+| ADR-013 | Open items from the Learn and Practice designs (notes, weak-spot removal, export, copy) | Accepted (decisions 7 and 9 not yet implemented; TASK-050, TASK-049) |
 | ADR-014 | Refuse to open a database whose schema is newer than the code | Accepted (not yet implemented; TASK-050) |
 | ADR-015 | Move the database code out of `app.py` into `db.py` | Accepted (not yet implemented; TASK-051, needs the `CLAUDE.md` write-areas update) |
 
