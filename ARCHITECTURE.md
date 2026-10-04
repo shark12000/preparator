@@ -35,15 +35,15 @@ Browser `localStorage` holds volatile UI state only; SQLite holds all durable pr
 
 - Today: `preparator-theme` (light/dark) and `preparator-filters` (Practice filters).
 - Planned (ADR-011, TASK-033): `preparator-draft:<question_id>` answer drafts.
-- Planned (ADR-012): `preparator-open-question`, a pointer to the revealed but unsubmitted question so it can be resumed after a reload, through the search gate.
+- Planned (ADR-012, amended by ADR-016): `preparator-open-question`, a pointer to the revealed but unsubmitted question so it can be resumed after a reload with one click (a targeted question request; no search step).
 
 `localStorage` never holds solutions, explanations or criteria, and it is not part of the progress backup (ADR-010). Moving any of this into SQLite needs a write endpoint (ADR-002) and is only worth it if drafts must survive a browser data wipe.
 
 ## Main Flows
 
 1. `GET /` serves the application shell.
-2. Starting a question opens a Google search in a browser tab. The user confirms they reviewed it; `POST /api/question` checks the confirmation flag and allowed search host before returning one question. The server does not independently verify browser activity or search-result contents.
-   An optional `question_id` serves that specific question (used by "Practice this one" in Weak spots); the search confirmation is still required.
+2. Practice opens on an intro with the filters and one primary button; pressing it serves the question (nothing is requested on page load; ADR-016 decision 7). `POST /api/question` returns one question chosen by the filters (least practiced first), or the weak-spot queue in review mode. An optional `question_id` serves that specific question (used by "Practice this one" in Weak spots). There is no search or confirmation step (ADR-016); legacy `source_confirmed`, `source_url` and `search_query` fields are ignored if sent.
+   Status: planned (api-contract PLANNED-13, TASK-061; UI from TASK-062). Until then the code opens a Google search in a new tab, waits for a self-attested "I've reviewed it", and the server requires the confirmation flag and an allowed search URL.
 3. `POST /api/answer` applies a keyword rubric, stores the attempt, updates the weakness queue, and returns matched/missing criteria, theory, and the example solution.
 4. `GET /api/dashboard` returns totals, per-topic and topic × level averages, a daily trend (local dates), the practice streak, weak spots, and recent attempts.
 5. `GET /api/theory` lists theory-mode questions as lessons. `POST` and `DELETE /api/theory/<id>` save or remove a lesson; saved notes are updated through the same `POST` endpoint.
@@ -61,7 +61,7 @@ The default URL is `http://127.0.0.1:5000`. `PORT` changes the listen port; `PRE
 ## Agent Guardrails
 
 - Preserve one-question-at-a-time behavior. Do not include a solution in the question response; reveal it only after answer submission.
-- Keep source confirmation before question delivery. It is a user confirmation, not proof that a search was completed.
+- The practice flow has no search or source-confirmation step before a question (human decision 2026-10-04, ADR-016). This replaces the former guardrail "Keep source confirmation before question delivery"; until TASK-061 and the frontend tasks from TASK-062 land, the code still has the old step.
 - Keep rubric scoring labeled as heuristic; it is not semantic or AI grading.
 - Coding prompts provide a textarea starter and accept submitted source as text. Submitted Python is not executed by the app.
 - Test database behavior with temporary databases. Avoid mutating `instance/preparator.sqlite3` in tests.
@@ -92,14 +92,15 @@ Decisions are recorded in `docs/architecture/adr/`. Planned API changes are in `
 | ADR-004 | Lesson notes survive "Remove from saved" | Accepted |
 | ADR-005 | Retire question rows that are no longer in the bank | Accepted |
 | ADR-006 | Python lint tooling, and how frontend fixes are verified | Accepted |
-| ADR-007 | Practice flow product decisions | Accepted |
+| ADR-007 | Practice flow product decisions | Accepted (decisions 1 and 6 superseded, decision 4 reworded by ADR-016) |
 | ADR-008 | Spaced-repetition review schedule, separate from the weak-spot queue | Accepted (not yet implemented) |
-| ADR-009 | Source confirmation once per mock-interview session | Proposed (awaiting human approval) |
+| ADR-009 | Source confirmation once per mock-interview session | Superseded by ADR-016 |
 | ADR-010 | Progress backup format and import validation rules | Accepted (not yet implemented) |
 | ADR-011 | Answer drafts in localStorage; read-only, solution-free attempt history | Accepted (not yet implemented) |
-| ADR-012 | Resume an unfinished question after reload, through the search gate | Accepted (not yet implemented; needs a design addendum) |
+| ADR-012 | Resume an unfinished question after reload, through the search gate | Accepted, amended by ADR-016 (resume is one click, no search; not yet implemented; needs a design addendum) |
 | ADR-013 | Open items from the Learn and Practice designs (notes, weak-spot removal, export, copy) | Accepted (decisions 7 and 9 not yet implemented; TASK-050, TASK-049) |
 | ADR-014 | Refuse to open a database whose schema is newer than the code | Accepted (not yet implemented; TASK-050) |
 | ADR-015 | Move the database code out of `app.py` into `db.py` | Accepted (not yet implemented; TASK-051, needs the `CLAUDE.md` write-areas update) |
+| ADR-016 | Remove the search and source-confirmation step before a question | Accepted (human approval 2026-10-04; changes a guardrail; not yet implemented: TASK-061 backend, TASK-062 design, then frontend tasks) |
 
-ADR-002 and ADR-005 carry 2026-10-04 clarifications (the `[::1]` rationale; the determinism addendum).
+ADR-002 and ADR-005 carry 2026-10-04 clarifications (the `[::1]` rationale; the determinism addendum). ADR-001, ADR-007, ADR-009, ADR-011 and ADR-012 carry 2026-10-04 notes pointing to ADR-016.

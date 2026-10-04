@@ -19,7 +19,7 @@ Rules:
 - Consume the backend only through `docs/architecture/api-contract.md` (current endpoints plus the PLANNED entries your task references). Do not invent endpoints; report what is missing.
 - Use the CSS custom properties (`--text`, `--surface`, `--accent`, `--fs-*` and the rest), never raw hex colors or ad-hoc font sizes. Every color must work in both light and dark themes. Minimum text size is 12px.
 - Escape all dynamic text with `escapeHtml` (or use `textContent`). Handle loading, empty, error, disabled and focus states. Use semantic HTML, labels, keyboard access and visible `:focus-visible`.
-- Respect the guardrails in `ARCHITECTURE.md`: keep the search step before a question is served; never show a solution before submission; present the score as a keyword-rubric heuristic.
+- Respect the guardrails in `ARCHITECTURE.md`: no search or source-confirmation step before a question (ADR-016); never show a solution before submission; present the score as a keyword-rubric heuristic.
 - Wrap every `localStorage` access in try/catch (use the `storage` helper in app.js).
 - Keep the design system current: if your task adds or changes a token or a component (selectors, states, markup pattern), update the matching section of `docs/design/design-system.md` in the same task so it describes the code as it now is, with correct line references. Edit only those sections; anything that is a new design decision goes back to the designer as a question.
 
