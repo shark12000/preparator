@@ -167,7 +167,7 @@ QUESTION_BANK = [
                 "alternatives": [
                     {
                         "label": "Handles the error with try/except KeyError (EAFP)",
-                        "keywords": ["try/except", "try-except", "try / except", "except keyerror", "try:", "eafp"],
+                        "keywords": ["try/except", "try-except", "try / except", "try except", "try and except", "except keyerror", "try:", "eafp"],
                     }
                 ],
                 "related": ["get method", "get()", "check if the key", "check whether the key"],

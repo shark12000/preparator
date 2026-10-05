@@ -68,6 +68,13 @@ class PreparatorTests(unittest.TestCase):
         result = preparator.evaluate_answer("exception", self._dict_criteria())
         self.assertNotEqual(result["concepts"][1]["state"], "covered")
         self.assertIsNone(result["concepts"][1]["alternative"])
+        result = preparator.evaluate_answer("I was trying to use get", self._dict_criteria())
+        self.assertIsNone(result["concepts"][1]["alternative"])
+
+    def test_dict_eafp_alternative_accepts_unslashed_phrases(self):
+        for answer in ("use try except around it", "wrap it with try and except"):
+            result = preparator.evaluate_answer(answer, self._dict_criteria())
+            self.assertEqual(result["concepts"][1]["state"], "covered", answer)
 
     def test_keywords_match_at_word_starts_only(self):
         criteria = [{"label": "counting", "keywords": ["count"]}]
@@ -1270,6 +1277,213 @@ class PreparatorTests(unittest.TestCase):
         titles = [x["title"] for x in self.client.get("/api/theory").get_json()["lessons"]]
         self.assertNotIn("Stale prompt", titles)
         self.assertIn("stale note", self.client.get("/api/theory/export.csv").get_data(as_text=True))
+
+    # ---- TASK-068: rubric overrides ----
+    def test_version_3_database_upgrades_to_overrides_table(self):
+        path = self._fresh_database_path()
+        self._run_init(path)
+        connection = sqlite3.connect(path)
+        connection.executescript("""
+            DROP TABLE rubric_overrides;
+            PRAGMA user_version = 3;
+        """)
+        qid = connection.execute("SELECT id FROM questions LIMIT 1").fetchone()[0]
+        connection.execute(
+            "INSERT INTO attempts (question_id, answer, score, created_at) "
+            "VALUES (?, 'a', 3, '2026-01-01T00:00:00+00:00')", (qid,))
+        connection.execute(
+            "INSERT INTO weaknesses (question_id, miss_count, last_score, updated_at) "
+            "VALUES (?, 1, 3, '2026-01-01T00:00:00+00:00')", (qid,))
+        connection.commit()
+        before = {t: connection.execute(f"SELECT * FROM {t} ORDER BY rowid").fetchall()
+                  for t in ("attempts", "weaknesses", "questions", "saved_lessons")}
+        connection.close()
+        self._run_init(path)
+        self.assertEqual(self._schema_snapshot(path)[2], preparator.MIGRATIONS[-1][0])
+        self.assertGreaterEqual(preparator.MIGRATIONS[-1][0], 4)
+        connection = sqlite3.connect(path)
+        try:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM rubric_overrides").fetchone()[0], 0)
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0], 1)
+            for table, rows in before.items():
+                self.assertEqual(
+                    connection.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall(), rows, table)
+            index_names = {r[1] for r in connection.execute("PRAGMA index_list(rubric_overrides)")}
+            self.assertIn("rubric_overrides_question_id", index_names)
+        finally:
+            connection.close()
+
+    def _attempt_for(self, answer, prompt=None):
+        prompt = prompt or self.DICT_PROMPT
+        with preparator.app.app_context():
+            qid = preparator.get_db().execute(
+                "SELECT id FROM questions WHERE prompt = ?", (prompt,)).fetchone()[0]
+        response = self.client.post("/api/answer", json={"question_id": qid, "answer": answer})
+        self.assertEqual(response.status_code, 200)
+        return qid, response.get_json()
+
+    def _override_rows(self):
+        with preparator.app.app_context():
+            return [tuple(r) for r in preparator.get_db().execute(
+                "SELECT attempt_id, question_id, criterion_index, criterion_label "
+                "FROM rubric_overrides ORDER BY id")]
+
+    PARTIAL_ANSWER = "You are not able to access it with bracket notation. Use try/except to catch the error."
+
+    def test_override_on_not_detected_and_partial_is_idempotent(self):
+        qid, result = self._attempt_for(self.PARTIAL_ANSWER)
+        attempt_id = result["attempt_id"]
+        states = [c["state"] for c in result["concepts"]]
+        self.assertEqual(states, ["partial", "covered", "not_detected"])
+        url = f"/api/attempts/{attempt_id}/overrides"
+        for index in (0, 2):
+            for _ in range(2):
+                response = self.client.post(url, json={"criterion_index": index})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.get_json(), {
+                    "attempt_id": attempt_id, "criterion_index": index, "overridden": True})
+        rows = self._override_rows()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0], (attempt_id, qid, 0, result["concepts"][0]["label"]))
+        with preparator.app.app_context():
+            first = [tuple(r) for r in preparator.get_db().execute(
+                "SELECT id, created_at FROM rubric_overrides ORDER BY id")]
+        self.assertEqual(len(first), 2)
+        self.assertEqual(self.client.post(url, json={"criterion_index": 0}).status_code, 200)
+        with preparator.app.app_context():
+            again = [tuple(r) for r in preparator.get_db().execute(
+                "SELECT id, created_at FROM rubric_overrides ORDER BY id")]
+        self.assertEqual(again, first)
+
+    def test_override_409_check_strips_the_coding_starter(self):
+        # The stored answer keeps the starter lines. A keyword that appears only in the
+        # starter must not count as detected, so the override is allowed (200, not 409).
+        with preparator.app.app_context():
+            database = preparator.get_db()
+            found = None
+            for row in database.execute(
+                    "SELECT * FROM questions WHERE retired = 0 AND mode = 'Coding' ORDER BY id"):
+                starter = preparator.effective_starter(row)
+                if not starter:
+                    continue
+                answer = starter + "\n    pass"
+                criteria = json.loads(row["criteria"])
+                stripped = preparator.evaluate_answer(answer, criteria, starter)["concepts"]
+                raw = preparator.evaluate_answer(answer, criteria, "")["concepts"]
+                for index, (kept, unstripped) in enumerate(zip(stripped, raw)):
+                    if kept["state"] != "covered" and unstripped["state"] == "covered":
+                        found = (row["id"], answer, index)
+                        break
+                if found:
+                    break
+        self.assertIsNotNone(found)
+        qid, answer, index = found
+        response = self.client.post("/api/answer", json={"question_id": qid, "answer": answer})
+        self.assertEqual(response.status_code, 200)
+        result = response.get_json()
+        self.assertNotEqual(result["concepts"][index]["state"], "covered")
+        response = self.client.post(
+            f"/api/attempts/{result['attempt_id']}/overrides", json={"criterion_index": index})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(self._override_rows()), 1)
+
+    def test_override_post_errors_and_precedence(self):
+        _, result = self._attempt_for(self.PARTIAL_ANSWER)
+        url = f"/api/attempts/{result['attempt_id']}/overrides"
+        response = self.client.post(url, json=[1])
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {"error": "The request body must be a JSON object."})
+        for body in ({}, {"criterion_index": None}, {"criterion_index": True},
+                     {"criterion_index": "1"}, {"criterion_index": 1.5}):
+            response = self.client.post(url, json=body)
+            self.assertEqual(response.status_code, 400, body)
+            self.assertEqual(response.get_json(), {"error": "criterion_index must be an integer."})
+        response = self.client.post("/api/attempts/999999/overrides", json={"criterion_index": "x"})
+        self.assertEqual(response.status_code, 400)
+        for attempt in ("999999", "99999999999999999999"):
+            response = self.client.post(f"/api/attempts/{attempt}/overrides", json={"criterion_index": 0})
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.get_json(), {"error": "Attempt not found."})
+        self.assertEqual(self.client.post("/api/attempts/-1/overrides", json={"criterion_index": 0}).status_code, 404)
+        for index in (-1, 3, 99999999999999999999):
+            response = self.client.post(url, json={"criterion_index": index})
+            self.assertEqual(response.status_code, 400, index)
+            self.assertEqual(response.get_json(), {
+                "error": "That concept is not part of this question's rubric."})
+        response = self.client.post(url, json={"criterion_index": 1})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.get_json(), {"error": "The rubric already detected this concept."})
+        self.assertEqual(self._override_rows(), [])
+
+    def test_override_delete(self):
+        _, result = self._attempt_for("It fails with brackets.")
+        attempt_id = result["attempt_id"]
+        url = f"/api/attempts/{attempt_id}/overrides"
+        self.assertEqual(self.client.post(url, json={"criterion_index": 2}).status_code, 200)
+        response = self.client.delete(f"{url}/2")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {
+            "attempt_id": attempt_id, "criterion_index": 2, "overridden": False})
+        self.assertEqual(self._override_rows(), [])
+        self.assertEqual(self.client.delete(f"{url}/2").status_code, 200)
+        self.assertEqual(self.client.delete(f"{url}/7").get_json()["overridden"], False)
+        response = self.client.delete(f"{url}/99999999999999999999")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()["overridden"])
+        for path in ("/api/attempts/999999/overrides/0", "/api/attempts/99999999999999999999/overrides/0"):
+            response = self.client.delete(path)
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.get_json(), {"error": "Attempt not found."})
+        self.assertEqual(self.client.delete("/api/attempts/1/overrides/-1").status_code, 404)
+
+    def test_override_does_not_change_scores_weaknesses_or_dashboard(self):
+        qid, result = self._attempt_for("It fails with brackets.")
+        self.assertLess(result["score"], preparator.WEAK_SCORE_THRESHOLD)
+
+        def snapshot():
+            with preparator.app.app_context():
+                database = preparator.get_db()
+                return (
+                    [tuple(r) for r in database.execute("SELECT * FROM attempts ORDER BY id")],
+                    [tuple(r) for r in database.execute("SELECT * FROM weaknesses ORDER BY question_id")],
+                    self.client.get("/api/dashboard").get_json(),
+                )
+
+        before = snapshot()
+        url = f"/api/attempts/{result['attempt_id']}/overrides"
+        self.assertEqual(self.client.post(url, json={"criterion_index": 2}).status_code, 200)
+        self.assertEqual(snapshot(), before)
+        self.assertEqual(self.client.delete(f"{url}/2").status_code, 200)
+        self.assertEqual(snapshot(), before)
+        self.assertEqual(self.client.post(url, json={"criterion_index": 2}).status_code, 200)
+        again = self.client.post("/api/answer", json={"question_id": qid, "answer": "It fails with brackets."})
+        self.assertEqual(again.get_json()["previous_score"], result["score"])
+
+    def test_override_accepted_on_retired_question(self):
+        qid, result = self._attempt_for("It fails with brackets.")
+        with preparator.app.app_context():
+            database = preparator.get_db()
+            database.execute("UPDATE questions SET retired = 1 WHERE id = ?", (qid,))
+            database.commit()
+        response = self.client.post(
+            f"/api/attempts/{result['attempt_id']}/overrides", json={"criterion_index": 2})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(self._override_rows()), 1)
+
+    def test_override_conflicts_after_rubric_now_detects_concept(self):
+        qid, result = self._attempt_for("It fails with brackets.")
+        url = f"/api/attempts/{result['attempt_id']}/overrides"
+        self.assertEqual(self.client.post(url, json={"criterion_index": 2}).status_code, 200)
+        with preparator.app.app_context():
+            database = preparator.get_db()
+            criteria = json.loads(database.execute(
+                "SELECT criteria FROM questions WHERE id = ?", (qid,)).fetchone()[0])
+            criteria[2]["keywords"].append("brackets")
+            database.execute("UPDATE questions SET criteria = ? WHERE id = ?",
+                             (json.dumps(criteria), qid))
+            database.commit()
+        self.assertEqual(self.client.post(url, json={"criterion_index": 2}).status_code, 409)
+        self.assertEqual(len(self._override_rows()), 1)
 
     # ---- TASK-010: JSON errors and input validation ----
     def _search(self, **extra):

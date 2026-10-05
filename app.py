@@ -208,12 +208,32 @@ def _migration_3_retired_questions(database):
     )
 
 
+def _migration_4_rubric_overrides(database):
+    """ADR-017: recorded "I covered this" marks. Never read by scoring or the dashboard."""
+    database.execute(
+        """CREATE TABLE IF NOT EXISTS rubric_overrides (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            attempt_id INTEGER NOT NULL REFERENCES attempts(id),
+            question_id INTEGER NOT NULL REFERENCES questions(id),
+            criterion_index INTEGER NOT NULL,
+            criterion_label TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(attempt_id, criterion_index)
+        )"""
+    )
+    database.execute(
+        "CREATE INDEX IF NOT EXISTS rubric_overrides_question_id "
+        "ON rubric_overrides(question_id)"
+    )
+
+
 # ADR-003: ordered (version, step) pairs. Steps must be additive only (new tables,
 # new columns with defaults, new indexes); never rewrite or drop user data.
 MIGRATIONS = [
     (1, _migration_1_baseline),
     (2, _migration_2_saved_flag),
     (3, _migration_3_retired_questions),
+    (4, _migration_4_rubric_overrides),
 ]
 
 
@@ -331,6 +351,7 @@ def evaluate_answer(answer, criteria, starter_code=""):
         related_hits = found(item.get("related", []))
         if keyword_hits:
             state = "covered"
+            alternative_label = None  # a direct keyword wins; no "also valid" note
         elif alternative_label is not None:
             state = "covered"
         elif related_hits:
@@ -352,7 +373,7 @@ def evaluate_answer(answer, criteria, starter_code=""):
                 "state": state,
                 "matched_terms": matched_terms,
                 "looked_for": list(item["keywords"]),
-                "alternative": alternative_label if not keyword_hits else None,
+                "alternative": alternative_label,
             }
         )
     if criteria:
@@ -703,6 +724,66 @@ def remove_weakness(question_id):
     database.execute("DELETE FROM weaknesses WHERE question_id = ?", (question_id,))
     database.commit()
     return jsonify({"removed": True})
+
+
+@app.post("/api/attempts/<int:attempt_id>/overrides")
+def add_rubric_override(attempt_id):
+    data, failure = read_json_object()
+    if failure:
+        return failure
+    criterion_index = data.get("criterion_index")
+    if not is_int_id(criterion_index):
+        return jsonify({"error": "criterion_index must be an integer."}), 400
+    database = get_db()
+    attempt = None
+    if attempt_id <= SQLITE_MAX_INT:
+        attempt = database.execute(
+            "SELECT id, question_id, answer FROM attempts WHERE id = ?", (attempt_id,)
+        ).fetchone()
+    if attempt is None:
+        return jsonify({"error": "Attempt not found."}), 404
+    # Retired questions are allowed: no `retired` filter here.
+    question = database.execute(
+        "SELECT * FROM questions WHERE id = ?", (attempt["question_id"],)
+    ).fetchone()
+    criteria = json.loads(question["criteria"])
+    if criterion_index < 0 or criterion_index >= len(criteria):
+        return jsonify({"error": "That concept is not part of this question's rubric."}), 400
+    result = evaluate_answer(attempt["answer"], criteria, effective_starter(question))
+    if result["concepts"][criterion_index]["state"] == "covered":
+        return jsonify({"error": "The rubric already detected this concept."}), 409
+    database.execute(
+        """INSERT OR IGNORE INTO rubric_overrides
+           (attempt_id, question_id, criterion_index, criterion_label, created_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        (attempt_id, attempt["question_id"], criterion_index,
+         criteria[criterion_index]["label"], utc_now()),
+    )
+    database.commit()
+    return jsonify(
+        {"attempt_id": attempt_id, "criterion_index": criterion_index, "overridden": True}
+    )
+
+
+@app.delete("/api/attempts/<int:attempt_id>/overrides/<int:criterion_index>")
+def remove_rubric_override(attempt_id, criterion_index):
+    database = get_db()
+    attempt = None
+    if attempt_id <= SQLITE_MAX_INT:
+        attempt = database.execute(
+            "SELECT id FROM attempts WHERE id = ?", (attempt_id,)
+        ).fetchone()
+    if attempt is None:
+        return jsonify({"error": "Attempt not found."}), 404
+    if criterion_index <= SQLITE_MAX_INT:
+        database.execute(
+            "DELETE FROM rubric_overrides WHERE attempt_id = ? AND criterion_index = ?",
+            (attempt_id, criterion_index),
+        )
+        database.commit()
+    return jsonify(
+        {"attempt_id": attempt_id, "criterion_index": criterion_index, "overridden": False}
+    )
 
 
 def prepare_database():
