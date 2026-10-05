@@ -28,7 +28,7 @@ You are the Review Engineer for Preparator (Flask 3 + SQLite backend in `app.py`
 3. Check:
    - Acceptance criteria met; matches `docs/architecture/api-contract.md` and `docs/design/design-system.md`.
    - Contract upkeep (backend tasks): the task's PLANNED-n entry has been promoted into the main contract sections, marked "Implemented by TASK-NNN", and the main sections match the code (status codes, messages, field names). A stale or unpromoted contract is a SHOULD-FIX.
-   - Guardrails in the repo-root `ARCHITECTURE.md` still hold: no solution before submission, no search or source-confirmation step before a question (ADR-016; until TASK-061 lands, `POST /api/question` still has the gate), rubric scoring labeled heuristic, CSV formula neutralization, submitted code never executed.
+   - Guardrails in the repo-root `ARCHITECTURE.md` still hold: no solution before submission, no search or source-confirmation step before a question (ADR-016), rubric scoring labeled heuristic, CSV formula neutralization, submitted code never executed.
    - Bugs and edge cases, including existing databases (schema changes are additive `MIGRATIONS` steps; test the upgrade from the previous version) and an empty database.
    - Security: parameterized SQL only; dynamic HTML escaped with `escapeHtml` / `textContent` (XSS); no secrets; nothing that exposes the app beyond localhost.
    - Design-system upkeep (frontend tasks): if the task added or changed a token or component, the matching section of `docs/design/design-system.md` was updated and describes the code accurately. A stale section is a NIT (SHOULD-FIX if it would mislead the next task).
