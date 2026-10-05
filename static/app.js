@@ -18,6 +18,7 @@ const state = {
   question: null,
   requesting: false,
   requestSeq: 0,
+  requestButton: null,
   questionSaved: false,
   editor: null,
   editorFailed: false,
@@ -197,12 +198,23 @@ function questionErrorMessage(error, { review }) {
   return error && error.message ? error.message : SERVER_ERROR_MESSAGE;
 }
 
+function clearBusy(button) {
+  if (!button) return;
+  button.removeAttribute("aria-busy");
+  button.removeAttribute("aria-disabled");
+  const label = button.querySelector("span");
+  if (label && button.dataset.idleLabel !== undefined) label.textContent = button.dataset.idleLabel;
+}
+
 // The only caller of POST /api/question: Start now; Next (TASK-064) and review entry (TASK-065) later.
 async function requestQuestion({ button, questionId = null, weakOnly = false, errorId = "intro-error" } = {}) {
   const review = questionId !== null || weakOnly;
   if (!review && state.requesting) return;
+  // A request that supersedes one started from a different button resets that older button (its finally is skipped).
+  if (state.requestButton && state.requestButton !== button) clearBusy(state.requestButton);
   const id = ++state.requestSeq;
   state.requesting = true;
+  state.requestButton = button || null;
   const label = button?.querySelector("span");
   // The idle label lives in data-idle-label, set once and never overwritten by the busy state.
   if (label && button.dataset.idleLabel === undefined) button.dataset.idleLabel = label.textContent;
@@ -227,11 +239,8 @@ async function requestQuestion({ button, questionId = null, weakOnly = false, er
   } finally {
     if (id === state.requestSeq) {
       state.requesting = false;
-      if (button) {
-        button.removeAttribute("aria-busy");
-        button.removeAttribute("aria-disabled");
-        if (label && button.dataset.idleLabel !== undefined) label.textContent = button.dataset.idleLabel;
-      }
+      state.requestButton = null;
+      clearBusy(button);
     }
   }
 }
@@ -421,10 +430,10 @@ async function saveForReview() {
 byId("save-question-button").addEventListener("click", saveForReview);
 byId("feedback-save-button").addEventListener("click", saveForReview);
 
-// Stopgap until TASK-064: back to the intro; the user presses Start.
 function nextQuestion() {
-  showIntro();
-  byId("start-button").focus();
+  const button = byId("next-button");
+  if (state.requesting || button.getAttribute("aria-disabled") === "true") return;
+  requestQuestion({ button, errorId: "feedback-error" });
 }
 byId("next-button").addEventListener("click", nextQuestion);
 
@@ -744,7 +753,7 @@ document.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (event.key === "?") { event.preventDefault(); dialog.showModal(); }
   else if (/^[1-4]$/.test(key)) setView(VIEWS[Number(key) - 1]);
-  else if (key === "n" && practiceActive && state.question && feedbackShown) nextQuestion();
+  else if (key === "n" && practiceActive && state.question && feedbackShown && !state.requesting) nextQuestion();
   else if (key === "s" && practiceActive && state.question) saveForReview();
 });
 
