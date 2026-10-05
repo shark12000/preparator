@@ -3,7 +3,7 @@
 Local Python interview-practice app. See `README.md` for features and `ARCHITECTURE.md` (repo root) for the design and the agent guardrails.
 
 ## Project facts
-- Backend: Python 3.14, Flask 3, SQLite (stdlib `sqlite3`) in `app.py`, `question_bank.py`, `coding_variants.py`; tests in `tests/` (unittest).
+- Backend: Python 3.14, Flask 3, SQLite (stdlib `sqlite3`) in `app.py`, `question_bank.py`, `coding_variants.py`, and `db.py` (connection, migrations and seeding, moved out of `app.py` by TASK-051 per ADR-015; until that task lands, this code is still in `app.py`); tests in `tests/` (unittest).
 - Schema: versioned migrations in `app.py` (`MIGRATIONS`, `PRAGMA user_version`); add a new step for every schema change. Steps are additive only.
 - Frontend: `templates/index.html`, `static/app.js`, `static/editor.js`, `static/style.css` (vanilla JS ES modules, CSS tokens, no build step). `static/vendor/codemirror.js` is a prebuilt bundle; do not hand-edit.
 - API contract: `docs/architecture/api-contract.md` (current endpoints plus PLANNED changes). As-built description of the code: `docs/architecture/as-built.md` (the repo-root `ARCHITECTURE.md` is the normative one).
@@ -14,7 +14,7 @@ Local Python interview-practice app. See `README.md` for features and `ARCHITECT
 ## Commands (run from the repo root)
 - Dev server: `.venv/Scripts/python.exe app.py` → http://127.0.0.1:5000 (`PORT` and `PREPARATOR_DATABASE` env vars are optional)
 - Tests: `.venv/Scripts/python.exe -m unittest discover -s tests`
-- Syntax checks: `.venv/Scripts/python.exe -m compileall -q app.py question_bank.py coding_variants.py tests`, `node --check static/app.js`, `node --check static/editor.js`
+- Syntax checks: `.venv/Scripts/python.exe -m compileall -q app.py question_bank.py coding_variants.py tests` (add `db.py` after `app.py` once TASK-051 has created it), `node --check static/app.js`, `node --check static/editor.js`
 - Lint / typecheck: none configured yet.
 - Dev tools (once): `.venv/Scripts/python.exe -m pip install -r requirements-dev.txt` then `.venv/Scripts/python.exe -m playwright install chromium`
 - Browser smoke check (scratch DB, both themes, desktop + 390px): `.venv/Scripts/python.exe -m tools.qa.qa_browser --smoke --out docs/qa/smoke`
@@ -35,7 +35,7 @@ This table is the single source of truth for who may write where. Agent files po
 | ideator | `docs/ideas/` |
 | lead-engineer | repo-root `ARCHITECTURE.md`, `README.md`, `docs/architecture/` (api-contract.md, as-built.md, adr/, agent-workflow.md, retros/), `docs/tasks/` (new task files; the `Size` line of any task), `docs/ideas/` (decision sections only) |
 | designer | `docs/design/` (audit.md, design-system.md, specs, research/), `docs/tasks/` (new frontend task files, and its own task file) |
-| backend-engineer | `app.py`, `question_bank.py`, `coding_variants.py`, `tests/`, `requirements.txt`, `requirements-dev.txt`, its own task file; `docs/architecture/api-contract.md` only to promote the PLANNED entry its task implements |
+| backend-engineer | `app.py`, `db.py`, `question_bank.py`, `coding_variants.py`, `tests/`, `requirements.txt`, `requirements-dev.txt`, its own task file; `docs/architecture/api-contract.md` only to promote the PLANNED entry its task implements |
 | frontend-engineer | `templates/`, `static/` (except `static/vendor/`), its own task file; `docs/design/design-system.md` only the section(s) describing tokens or components its task changed |
 | review-engineer | `docs/reviews/<task-id>.md` only (appends one `## Round N` section per review) |
 | qa-engineer | `docs/qa/<task-id>/` (check scripts, screenshots), `tools/qa/` (shared helpers), the "Manual check results" section and acceptance checkboxes of the task file it was given |
