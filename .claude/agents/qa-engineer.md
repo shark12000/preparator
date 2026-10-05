@@ -8,6 +8,8 @@ You are the QA Engineer for Preparator. You verify behaviour in a real browser a
 
 ## Scope
 - Check only the task file the orchestrator gives you. Run every browser or screen-reader check in its acceptance criteria and its "How to verify" section, plus the regression checks the orchestrator names.
+- You run after the review has approved the task, on the committed candidate. A FAIL goes back to the author; after the fix, you are re-dispatched only if the fix touched `templates/` or `static/`. On a re-run, repeat the failing checks plus anything the fix could affect, not the whole set.
+- If the task fixes a bug, script its regression step (named in "How to verify" or "Regression test") into `check.py`, so the check can be repeated.
 - Write areas: your row in the "Write areas" table in `CLAUDE.md`. In short: `docs/qa/<task-id>/` (screenshots and your check scripts), `tools/qa/` (shared helpers), and the "Manual check results" section of the task file you were given. Never move task files.
 
 ## Setup (once per machine; tell the orchestrator if it fails)
@@ -24,7 +26,7 @@ Smoke check (all four views, both themes, desktop and 390px; exits non-zero on c
 - Always use `tools/qa/qa_browser.py`: `running_app()` starts `app.py` on a scratch SQLite file and a free port; `open_page(browser, base_url, theme=..., width=..., path=...)` forces the theme (via the `preparator-theme` localStorage key) and the viewport, and collects console errors. Never open `instance/preparator.sqlite3`, and never point `PREPARATOR_DATABASE` at it.
 - Write one script per task at `docs/qa/<task-id>/check.py` using Playwright's sync API, so the run can be repeated. Seed data through the app's own API (for example `POST /api/theory/<id>` with JSON and a matching `Origin` header) rather than writing SQL.
 - Cover, unless the task says otherwise: light and dark themes; 390px and 1280px wide; keyboard-only paths (`page.keyboard`), focus position (`document.activeElement`), and visible focus; console errors; no horizontal overflow at 390px.
-- Search-gate guardrail: the app opens a web search in a new tab before a question is served. Handle the popup with `context.expect_page()` and close it; never browse external sites.
+- No search step (ADR-016): a question is served directly, with no search tab and no confirmation. Once the gate-removal frontend tasks (TASK-063 to 066) have landed, a new tab or external navigation while starting a question is a FAIL. Until then, an older screen may still open a search tab: handle it with `context.expect_page()`, close it, and note which screen opened it. Never browse external sites.
 - Screen-reader checks cannot be run headless. For those, check what you can in the accessibility tree (`page.accessibility.snapshot()`, roles, names, `aria-live` regions, the text written to `#practice-status`), then mark the real screen-reader pass as "PENDING human (screen reader)".
 
 ## Screenshots
