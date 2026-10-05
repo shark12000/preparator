@@ -79,29 +79,19 @@
         <div class="practice-layout">
           <div class="question-column">
             <section class="card question-card" id="question-panel">
-              <!-- Step 1: search gate -->
               <div class="state" id="state-intro">
-                <ol class="steps" aria-label="How a question works">
-                  <li class="current" id="step-search"><b>1</b>Search</li>
-                  <li id="step-answer"><b>2</b>Answer</li>
-                  <li id="step-review"><b>3</b>Review</li>
-                </ol>
-                <h2 class="state-title">Check what interviewers are asking.</h2>
-                <p class="state-copy">Before each prompt, open a web search for recent Python interview reports that match your filters. Results are third-party reports, not company-verified records. <span class="muted" id="bank-count"></span></p>
+                <h2 class="state-title">Start a practice question.</h2>
+                <p class="state-copy">One question at a time. Set Topic, Level and Format above, or leave them open. After you submit an answer, you see a rubric match: a keyword check, not a grade. <span class="muted" id="bank-count"></span></p>
                 <div class="button-row">
-                  <button class="btn btn-primary" id="search-button" type="button"><span>Open interview search</span><svg class="icon"><use href="#i-external"/></svg></button>
-                  <button class="btn btn-secondary hidden" id="reveal-button" type="button"><span>I've reviewed it — show question</span><svg class="icon"><use href="#i-arrow"/></svg></button>
+                  <button class="btn btn-primary" id="start-button" type="button"><span>Start question</span><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></button>
                 </div>
                 <p class="inline-error hidden" id="intro-error" role="alert"></p>
               </div>
 
-              <div class="state hidden" id="state-loading"><span class="loader" aria-hidden="true"></span><p>Preparing your question…</p></div>
-
-              <!-- Step 2 + 3: question, answer, feedback -->
+              <!-- Question, answer, feedback -->
               <div class="state hidden" id="state-question">
                 <div class="question-head">
                   <div class="tags" id="question-tags"></div>
-                  <a class="source-link" id="source-link" href="#" target="_blank" rel="noopener noreferrer"><svg class="icon"><use href="#i-check"/></svg>Search reviewed · results<svg class="icon"><use href="#i-external"/></svg></a>
                 </div>
                 <h2 class="question-text" id="question-text"></h2>
 

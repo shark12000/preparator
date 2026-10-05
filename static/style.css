@@ -218,21 +218,11 @@ h1 em, .tip-card em { color: var(--coral-text); font-style: italic; }
 .question-card { padding: 28px 32px 30px; min-height: 420px; }
 .state-title { margin: 22px 0 8px; color: var(--heading); font: 400 var(--fs-xl)/1.2 var(--serif); }
 .state-copy { max-width: 600px; margin: 0; color: var(--text-muted); }
-.steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.steps li { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; color: var(--text-subtle); font-size: var(--fs-sm); }
-.steps li b { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--surface-sunken); font: var(--fs-xs) var(--mono); }
-.steps li.current { background: var(--surface-sunken); color: var(--text); font-weight: 600; }
-.steps li.current b { background: var(--accent); color: var(--on-accent); }
-.steps li.done b { background: var(--success-bg); color: var(--success); }
-#state-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 340px; color: var(--text-muted); }
-#state-loading.hidden { display: none; }
+#state-intro .state-title { margin-top: 0; }
 .loader { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--coral); border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .question-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.source-link { display: inline-flex; align-items: center; gap: 6px; color: var(--success) !important; font-size: var(--fs-xs); text-decoration: none; }
-.source-link .icon { width: 14px; height: 14px; }
-.source-link:hover { text-decoration: underline; }
 .question-text { max-width: 760px; margin: 16px 0 24px; color: var(--heading); font: 400 26px/1.32 var(--serif); white-space: pre-line; }
 .field-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
 .field-label span { text-transform: none; letter-spacing: 0; font-family: var(--sans); }

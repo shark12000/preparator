@@ -16,11 +16,8 @@ const TIPS = {
 
 const state = {
   question: null,
-  searchUrl: "",
-  searchQuery: "",
-  searchOpened: false,
-  reviewOnly: false,
-  targetQuestionId: null,
+  requesting: false,
+  requestSeq: 0,
   questionSaved: false,
   editor: null,
   editorFailed: false,
@@ -174,89 +171,75 @@ function populateTopics(topics) {
 
 ["topic-select", "difficulty-select", "mode-select"].forEach((id) => byId(id).addEventListener("change", () => {
   storage.set("preparator-filters", JSON.stringify(readFilters()));
-  // A search opened for the old filters no longer matches; ask for a fresh one.
-  if (!state.question && state.searchOpened) resetSearchGate();
-  clearReviewTarget();
+  showError("intro-error", "");
+  if (byId("feedback-error")) showError("feedback-error", "");
   if (state.question) showToast("New filters apply to your next question.");
 }));
 
 /* ---------- Practice: state machine ---------- */
 function showState(name) {
-  ["intro", "loading", "question"].forEach((stateName) => byId(`state-${stateName}`).classList.toggle("hidden", stateName !== name));
-}
-
-function setStep(step) {
-  ["search", "answer", "review"].forEach((name, index) => {
-    const item = byId(`step-${name}`);
-    item.classList.toggle("current", index + 1 === step);
-    item.classList.toggle("done", index + 1 < step);
-  });
-}
-
-function clearReviewTarget() {
-  state.targetQuestionId = null;
-  state.reviewOnly = false;
-}
-
-function resetSearchGate() {
-  clearReviewTarget();
-  state.searchOpened = false;
-  byId("reveal-button").classList.add("hidden");
-  byId("search-button").querySelector("span").textContent = "Open interview search";
+  ["intro", "question"].forEach((stateName) => byId(`state-${stateName}`).classList.toggle("hidden", stateName !== name));
 }
 
 function showIntro() {
   state.question = null;
   stopTimer();
-  resetSearchGate();
-  setStep(1);
   showState("intro");
   showError("intro-error", "");
   byId("session-label").textContent = state.session.count ? `${plural(state.session.count, "question")} this session` : "No question yet";
 }
 
-function openSearch() {
-  const filters = readFilters();
-  const topic = filters.topic === "All topics" ? "Google Meta Amazon" : filters.topic;
-  const level = filters.difficulty === "Any level" ? "" : filters.difficulty;
-  const mode = filters.mode === "Any mode" ? "theory coding" : filters.mode;
-  state.searchQuery = `Python interview questions ${topic} ${level} ${mode} ${new Date().getFullYear()}`.replace(/\s+/g, " ").trim();
-  state.searchUrl = `https://www.google.com/search?q=${encodeURIComponent(state.searchQuery)}`;
-  window.open(state.searchUrl, "_blank", "noopener,noreferrer");
-  state.searchOpened = true;
-  byId("search-button").querySelector("span").textContent = "Open search again";
-  byId("reveal-button").classList.remove("hidden");
-  byId("reveal-button").focus();
+const NO_MATCH_MESSAGE = "No questions match those filters. Change a filter and try again.";
+
+// Review rows of the error table (404 texts) arrive with TASK-065; until then review shows error.message.
+function questionErrorMessage(error, { review }) {
+  if (!review && error && error.status === 404) return NO_MATCH_MESSAGE;
+  return error && error.message ? error.message : SERVER_ERROR_MESSAGE;
 }
 
-async function revealQuestion() {
-  if (!state.searchOpened) return;
-  showState("loading");
+// The only caller of POST /api/question: Start now; Next (TASK-064) and review entry (TASK-065) later.
+async function requestQuestion({ button, questionId = null, weakOnly = false, errorId = "intro-error" } = {}) {
+  const review = questionId !== null || weakOnly;
+  if (!review && state.requesting) return;
+  const id = ++state.requestSeq;
+  state.requesting = true;
+  const label = button?.querySelector("span");
+  // The idle label lives in data-idle-label, set once and never overwritten by the busy state.
+  if (label && button.dataset.idleLabel === undefined) button.dataset.idleLabel = label.textContent;
+  if (button) {
+    button.setAttribute("aria-busy", "true");
+    button.setAttribute("aria-disabled", "true");
+    if (label) label.textContent = "Loading question…";
+  }
+  showError(errorId, "");
+  announce("Loading question.");
   try {
-    // Review mode (weak spots or a targeted question) ignores the Practice filters (ADR-007).
-    const reviewing = state.reviewOnly || state.targetQuestionId !== null;
-    const data = await postJson("/api/question", {
-      ...(reviewing ? {} : readFilters()),
-      weak_only: state.reviewOnly,
-      question_id: state.targetQuestionId ?? undefined,
-      source_confirmed: true,
-      source_url: state.searchUrl,
-      search_query: state.searchQuery,
-    });
-    clearReviewTarget();
-    await renderQuestion(data.question);
+    // Review requests ignore the Practice filters (ADR-007).
+    const body = review
+      ? { weak_only: weakOnly, question_id: questionId ?? undefined }
+      : { ...readFilters(), weak_only: false };
+    const data = await postJson("/api/question", body);
+    if (id !== state.requestSeq) return;
+    await renderQuestion(data.question, { fromReview: review });
   } catch (error) {
-    showState("intro");
-    showError("intro-error", error.message);
+    if (id !== state.requestSeq) return;
+    showError(errorId, questionErrorMessage(error, { review }));
+  } finally {
+    if (id === state.requestSeq) {
+      state.requesting = false;
+      if (button) {
+        button.removeAttribute("aria-busy");
+        button.removeAttribute("aria-disabled");
+        if (label && button.dataset.idleLabel !== undefined) label.textContent = button.dataset.idleLabel;
+      }
+    }
   }
 }
 
-byId("search-button").addEventListener("click", () => {
-  // A fresh (non-review) search must not inherit an abandoned review target.
-  if (!state.searchOpened) clearReviewTarget();
-  openSearch();
+byId("start-button").addEventListener("click", (event) => {
+  if (event.currentTarget.getAttribute("aria-disabled") === "true") return;
+  requestQuestion({ button: event.currentTarget });
 });
-byId("reveal-button").addEventListener("click", revealQuestion);
 
 /* ---------- Practice: answering ---------- */
 const isCoding = () => state.question?.mode === "Coding";
@@ -277,8 +260,9 @@ function getAnswer() {
   return isCoding() && state.editor ? state.editor.getValue() : byId("answer-input").value;
 }
 
-async function renderQuestion(question) {
+async function renderQuestion(question, { fromReview = false } = {}) {
   state.question = question;
+  question.fromReview = fromReview;
   state.questionSaved = false;
   state.session.count += 1;
   const coding = question.mode === "Coding";
@@ -287,7 +271,6 @@ async function renderQuestion(question) {
 
   byId("question-tags").innerHTML = [question.topic, question.difficulty, question.mode].map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
   byId("question-text").textContent = question.prompt;
-  byId("source-link").href = state.searchUrl;
   byId("answer-type-label").textContent = coding ? "Python code" : "Your answer";
   byId("submit-button").querySelector("span").textContent = coding ? "Submit code" : "Submit answer";
 
@@ -310,12 +293,11 @@ async function renderQuestion(question) {
   showError("answer-error", "");
   byId("answer-area").classList.remove("hidden");
   byId("feedback").classList.add("hidden");
-  setStep(2);
   showState("question");
   updateAnswerLength();
   startTimer();
   announce(`New question: ${question.topic}, ${question.difficulty}, ${question.mode}`);
-  (useEditor ? editor : textarea).focus();
+  if (byId("practice-view").classList.contains("active")) (useEditor ? editor : textarea).focus();
 }
 
 // Polite status message for screen readers (separate from the word count).
@@ -404,7 +386,6 @@ function renderFeedback(result, answer) {
   byId("compare-block").open = isCoding();
   byId("answer-area").classList.add("hidden");
   byId("feedback").classList.remove("hidden");
-  setStep(3);
   byId("feedback-heading").focus({ preventScroll: true });
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   byId("feedback").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
@@ -440,9 +421,10 @@ async function saveForReview() {
 byId("save-question-button").addEventListener("click", saveForReview);
 byId("feedback-save-button").addEventListener("click", saveForReview);
 
+// Stopgap until TASK-064: back to the intro; the user presses Start.
 function nextQuestion() {
   showIntro();
-  openSearch();
+  byId("start-button").focus();
 }
 byId("next-button").addEventListener("click", nextQuestion);
 
@@ -471,9 +453,10 @@ function weakStatus(question) {
 function startReview({ questionId = null, weakOnly = false } = {}) {
   setView("practice");
   showIntro();
-  state.targetQuestionId = questionId;
-  state.reviewOnly = weakOnly;
-  openSearch();
+  // Stopgap until TASK-065: review failures (including 404) show error.message in the intro.
+  const button = byId("start-button");
+  button.focus();
+  requestQuestion({ button, questionId, weakOnly });
 }
 
 byId("review-weak-button").addEventListener("click", () => startReview({ weakOnly: true }));
