@@ -11,7 +11,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Open http://127.0.0.1:5000. Before each prompt, the app opens a live Google search for recent Python interview coverage and waits for you to confirm you reviewed it. The search link remains available with the question. Public results are third-party reports, not company-verified interview records. An internet connection is required to begin a question.
+Open http://127.0.0.1:5000. Pick your filters and press **Start question** to get a question; there is no web search step. The app runs offline apart from the web fonts it loads from Google Fonts.
 
 Progress is stored in `instance/preparator.sqlite3` on this computer. Remove that file to reset the local practice history.
 
@@ -41,7 +41,7 @@ npx esbuild entry.js --bundle --format=esm --minify --outfile=static/vendor/code
 
 ## Scoring note
 
-Answer feedback uses a small, visible concept-keyword rubric. It is useful for deliberate practice, but it is not semantic grading and does not replace a human interviewer or a language model. Each prompt includes a theory explanation and an optional solution, revealed only after submission.
+Answer feedback uses a small, visible concept-keyword rubric. A concept counts as covered when its keywords (or an accepted alternative approach) appear, and as partly covered (half credit) when only related words appear. It is useful for deliberate practice, but it is not semantic grading and does not replace a human interviewer or a language model. Each prompt includes a theory explanation and an optional solution, revealed only after submission.
 
 ## Tests
 
