@@ -38,7 +38,7 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => 
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 }[char]));
 const icon = (name, extra = "") => `<svg class="icon ${extra}"><use href="#i-${name}"/></svg>`;
-const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+const plural = (count, word, pluralWord = `${word}s`) => `${count} ${count === 1 ? word : pluralWord}`;
 const formatScore = (value) => (value === null || value === undefined ? "–" : Number(value).toFixed(Number.isInteger(Number(value)) ? 0 : 1));
 const storage = {
   get(key) { try { return localStorage.getItem(key); } catch (_error) { return null; } },
@@ -608,7 +608,7 @@ function renderMatrix(matrix) {
       // Strong cells are dark in light mode and bright in dark mode, so the text flips at different points.
       const invert = document.documentElement.dataset.theme === "dark" ? strength > 55 : strength > 75;
       const body = `Avg match ${formatScore(row.average)}/10 · ${plural(row.attempts, "answer")}`;
-      return `<td class="cell ${invert ? "invert-text" : ""}" style="background: color-mix(in oklab, var(--chart) ${strength}%, var(--surface))" ${tipAttrs(topic, level, body)}><span><b>${formatScore(row.average)}</b><span class="visually-hidden"> average match out of 10, </span><small>${plural(row.attempts, "try")}</small></span></td>`;
+      return `<td class="cell ${invert ? "invert-text" : ""}" style="background: color-mix(in oklab, var(--chart) ${strength}%, var(--surface))" ${tipAttrs(topic, level, body)}><span><b>${formatScore(row.average)}</b><span class="visually-hidden"> average match out of 10, </span><small>${plural(row.attempts, "try", "tries")}</small></span></td>`;
     }).join("")}</tr>`).join("");
   byId("matrix-chart").innerHTML = `
     <table class="matrix">
