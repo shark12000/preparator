@@ -223,8 +223,8 @@ h1 em, .tip-card em { color: var(--coral-text); font-style: italic; }
 .loader { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--coral); border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.question-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.question-text { max-width: 760px; margin: 16px 0 24px; color: var(--heading); font: 400 26px/1.32 var(--serif); white-space: pre-line; }
+.question-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.question-text { max-width: 760px; margin: 14px 0 24px; color: var(--heading); font: 400 26px/1.32 var(--serif); white-space: pre-line; }
 .field-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
 .field-label span { text-transform: none; letter-spacing: 0; font-family: var(--sans); }
 .answer-input { display: block; width: 100%; min-height: 180px; padding: 14px 16px; resize: vertical; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-code); font-size: var(--fs-md); line-height: 1.65; }
