@@ -365,7 +365,7 @@ pre { margin: 6px 0 0; padding: 12px 14px; overflow: auto; border-radius: var(--
 @media (max-width: 1080px) {
   .app-shell { grid-template-columns: 206px minmax(0, 1fr); }
   .main-content { padding-inline: 28px; }
-  .practice-layout { grid-template-columns: 1fr; }
+  .practice-layout { grid-template-columns: minmax(0, 1fr); }
   .session-rail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .progress-grid { grid-template-columns: 1fr; }
 }
