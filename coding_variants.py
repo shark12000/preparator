@@ -320,7 +320,7 @@ CODING_ARCHETYPES = [
         "prompt": "Write is_even(number), returning True when the integer is even and False otherwise.",
         "starter_code": "def is_even(number: int) -> bool:\n    pass",
         "criteria": [
-            {"label": "Uses remainder or parity", "keywords": ["% 2", "even", "parity"]},
+            {"label": "Uses remainder or parity", "keywords": ["% 2", "even", "parity", "%2", "& 1", "&1", "remainder"]},
             {"label": "Returns a boolean result", "keywords": ["return", "bool", "true", "false"]},
             {"label": "Handles zero and negative integers", "keywords": ["zero", "negative", "% 2"]},
         ],
@@ -335,7 +335,7 @@ CODING_ARCHETYPES = [
         "prompt": "Write factorial(number) for a non-negative integer. Define 0! as 1.",
         "starter_code": "def factorial(number: int) -> int:\n    pass",
         "criteria": [
-            {"label": "Uses the multiplicative definition", "keywords": ["multiply", "product", "factorial"]},
+            {"label": "Uses the multiplicative definition", "keywords": ["multiply", "product", "factorial", "*=", "* i", "*i", "reduce(", "prod("]},
             {"label": "Has the zero base case", "keywords": ["zero", "1", "base case"]},
             {"label": "Returns an integer result", "keywords": ["return", "range(", "integer"]},
         ],
@@ -366,7 +366,7 @@ CODING_ARCHETYPES = [
         "starter_code": "def even_squares(values: list[int]) -> list[int]:\n    pass",
         "criteria": [
             {"label": "Filters even values", "keywords": ["% 2", "even", "if "]},
-            {"label": "Squares each selected value", "keywords": ["** 2", "* value", "square"]},
+            {"label": "Squares each selected value", "keywords": ["** 2", "* value", "square", "**2", "pow("], "related": ["* x", "*x", "n * n", "n*n"]},
             {"label": "Builds a new ordered list", "keywords": ["list comprehension", "for value", "append", "return"]},
         ],
         "explanation": "A list comprehension performs a filter and mapping in one pass. It preserves input order and creates a new list, leaving the original untouched. Time and output space are O(n).",
@@ -396,7 +396,7 @@ CODING_ARCHETYPES = [
         "starter_code": "def is_palindrome(text: str) -> bool:\n    pass",
         "criteria": [
             {"label": "Normalizes case and filters characters", "keywords": ["casefold", "lower(", "isalnum", "alphanumeric"]},
-            {"label": "Compares with a reverse or two-pointer scan", "keywords": ["[::-1]", "reverse", "two pointer", "two-pointer"]},
+            {"label": "Compares with a reverse or two-pointer scan", "keywords": ["[::-1]", "reverse", "two pointer", "two-pointer", "left < right", "i < j"], "related": ["from both ends"]},
             {"label": "Handles empty normalized input", "keywords": ["empty", "''", "\"\"", "true"]},
         ],
         "explanation": "Normalize by retaining alphanumeric characters and applying case folding, then compare the result to its reverse. The empty normalized string equals its reverse. This direct approach uses O(n) time and O(n) extra space.",
@@ -425,7 +425,7 @@ CODING_ARCHETYPES = [
         "prompt": "Write sum_digits(number) for a non-negative integer, returning the sum of its decimal digits.",
         "starter_code": "def sum_digits(number: int) -> int:\n    pass",
         "criteria": [
-            {"label": "Visits each decimal digit", "keywords": ["str(", "while", "% 10"]},
+            {"label": "Visits each decimal digit", "keywords": ["str(", "while", "% 10", "%10"], "alternatives": [{"label": "Peels digits with divmod or integer division", "keywords": ["divmod(", "// 10", "//10", "//= 10", "//=10", "for digit in"]}]},
             {"label": "Converts digits to integers", "keywords": ["int(", "digit"]},
             {"label": "Accumulates a total", "keywords": ["sum", "+=", "return"]},
         ],
@@ -441,7 +441,7 @@ CODING_ARCHETYPES = [
         "starter_code": "def first_unique(text: str) -> str | None:\n    pass",
         "criteria": [
             {"label": "Counts character frequencies", "keywords": ["counter", "count", "frequency"]},
-            {"label": "Scans original order", "keywords": ["for char", "for character", "for item"]},
+            {"label": "Scans original order", "keywords": ["for char", "for character", "for item", "for c in", "for ch in", "enumerate("]},
             {"label": "Returns None when absent", "keywords": ["none", "return none"]},
         ],
         "explanation": "Count each character, then scan the original string from left to right and return the first with frequency one. Counting and scanning are both O(n), with O(k) extra space for k distinct characters.",
@@ -470,7 +470,7 @@ CODING_ARCHETYPES = [
         "prompt": "Write binary_search(values, target) for ascending sorted integers. Return a matching index or -1.",
         "starter_code": "def binary_search(values: list[int], target: int) -> int:\n    pass",
         "criteria": [
-            {"label": "Maintains search bounds", "keywords": ["left", "right", "low", "high"]},
+            {"label": "Maintains search bounds", "keywords": ["left", "right", "low", "high", "lo =", "hi =", "lo, hi", "lo=", "hi=", "start =", "end ="], "alternatives": [{"label": "Uses the bisect module", "keywords": ["bisect"]}]},
             {"label": "Halves the range at the midpoint", "keywords": ["mid", "middle", "// 2"]},
             {"label": "Returns -1 for a missing target", "keywords": ["return -1", "while left <= right", "while low <= high"]},
         ],
@@ -486,7 +486,7 @@ CODING_ARCHETYPES = [
         "starter_code": "def missing_number(values: list[int]) -> int:\n    pass",
         "criteria": [
             {"label": "Derives n from the list length", "keywords": ["len(", "length", "n ="]},
-            {"label": "Compares expected and actual totals", "keywords": ["sum(", "expected", "actual", "arithmetic"]},
+            {"label": "Compares expected and actual totals", "keywords": ["sum(", "expected", "actual", "arithmetic"], "related": ["n * (n + 1)", "n*(n+1)", "gauss"], "alternatives": [{"label": "Cancels pairs with XOR", "keywords": ["xor", "^=", " ^ "]}]},
             {"label": "Returns the missing value", "keywords": ["return", "missing", "n + 1"]},
         ],
         "explanation": "The full range ends at n = len(values) + 1. Subtract the observed sum from n(n+1)/2 to get the missing value. This relies on the stated uniqueness and range constraints and runs in O(n) time with O(1) extra space.",
@@ -515,7 +515,7 @@ CODING_ARCHETYPES = [
         "prompt": "Write rotate_right(values, amount), returning a right-rotated copy. Amount may exceed the list length; empty input returns an empty list.",
         "starter_code": "def rotate_right(values: list[int], amount: int) -> list[int]:\n    pass",
         "criteria": [
-            {"label": "Reduces rotation modulo list length", "keywords": ["% len", "modulo", "%="]},
+            {"label": "Reduces rotation modulo list length", "keywords": ["% len", "modulo", "%=", "% n", "%n", "% length", "%len", "remainder"], "alternatives": [{"label": "Rotates with collections.deque", "keywords": ["rotate(", "deque("]}]},
             {"label": "Handles empty lists", "keywords": ["empty", "if not values", "if not"]},
             {"label": "Moves the suffix to the front", "keywords": ["values[-", "slice", "concatenate", "+"]},
         ],
@@ -530,8 +530,8 @@ CODING_ARCHETYPES = [
         "prompt": "Write two_sum(values, target), returning indices of two distinct items whose values add to target, or None if no pair exists.",
         "starter_code": "def two_sum(values: list[int], target: int) -> list[int] | None:\n    pass",
         "criteria": [
-            {"label": "Looks up complements", "keywords": ["complement", "target -", "target-"]},
-            {"label": "Uses a map for prior values", "keywords": ["seen", "dictionary", "{}", "hash map"]},
+            {"label": "Looks up complements", "keywords": ["complement", "target -", "target-"], "related": ["difference", "needed"], "alternatives": [{"label": "Checks pairs directly against the target", "keywords": ["== target", "+ values[j]", "+ values[i]"]}]},
+            {"label": "Uses a map for prior values", "keywords": ["seen", "dictionary", "{}", "hash map", "dict ", "dict(", "dict[", "dict.", "dict,", "hashmap", "lookup"], "alternatives": [{"label": "Checks all pairs (brute force)", "keywords": ["for j in range(i", "range(i + 1", "range(i+1"]}]},
             {"label": "Returns distinct indices or None", "keywords": ["index", "none", "return"]},
         ],
         "explanation": "For each value, its needed partner is target - value. Store prior values with their indices so each lookup is O(1) on average. Check for a complement before adding the current item, ensuring an element is not paired with itself. Overall expected time is O(n) and space is O(n).",
@@ -545,7 +545,7 @@ CODING_ARCHETYPES = [
         "prompt": "Write merge_sorted(left, right) for two ascending integer lists. Return one ascending list containing all values.",
         "starter_code": "def merge_sorted(left: list[int], right: list[int]) -> list[int]:\n    pass",
         "criteria": [
-            {"label": "Uses two advancing indices", "keywords": ["left_index", "right_index", "i, j", "two pointer"]},
+            {"label": "Uses two advancing indices", "keywords": ["left_index", "right_index", "i, j", "two pointer", "i += 1", "j += 1", "i = j = 0", "i=j=0"], "alternatives": [{"label": "Uses a library merge or sorts the concatenation", "keywords": ["heapq.merge", "sorted(left + right)", "sorted(left+right)"]}]},
             {"label": "Chooses the smaller next value", "keywords": ["<=", "compare", "smaller"]},
             {"label": "Appends remaining values", "keywords": ["extend(", "remaining", "while"]},
         ],
@@ -560,7 +560,7 @@ CODING_ARCHETYPES = [
         "prompt": "Write max_single_trade_profit(prices), returning the best profit from one buy followed by a later sell, or zero when no trade profits.",
         "starter_code": "def max_single_trade_profit(prices: list[int]) -> int:\n    pass",
         "criteria": [
-            {"label": "Tracks the lowest earlier price", "keywords": ["minimum", "min_price", "lowest", "buy"]},
+            {"label": "Tracks the lowest earlier price", "keywords": ["minimum", "min_price", "lowest", "buy", "min(", "min_so_far", "cheapest", "smallest", "low ="]},
             {"label": "Computes profit before updating the minimum", "keywords": ["price -", "profit", "sell"]},
             {"label": "Handles short or declining input", "keywords": ["zero", "max(0", "empty", "len("]},
         ],
@@ -575,8 +575,8 @@ CODING_ARCHETYPES = [
         "prompt": "Write count_change(coins, amount), counting unordered combinations using distinct positive denominations with unlimited reuse.",
         "starter_code": "def count_change(coins: list[int], amount: int) -> int:\n    pass",
         "criteria": [
-            {"label": "Uses a one-dimensional ways table", "keywords": ["ways =", "dp =", "amount + 1", "dynamic programming"]},
-            {"label": "Initializes one way to make zero", "keywords": ["ways[0] = 1", "dp[0] = 1", "zero amount"]},
+            {"label": "Uses a one-dimensional ways table", "keywords": ["ways =", "dp =", "amount + 1", "dynamic programming", "[0] * (amount", "[0]*(amount", "dp=", "ways=", "table =", "table="], "related": ["array", "list of size"]},
+            {"label": "Initializes one way to make zero", "keywords": ["ways[0] = 1", "dp[0] = 1", "zero amount", "[0]=1", "[0] = 1", "[1] + [0]"], "related": ["base case", "zero ways"]},
             {"label": "Processes each coin before ascending totals", "keywords": ["for coin", "range(coin", "combinations"]},
         ],
         "explanation": "Let ways[a] count combinations that make amount a. There is one way to make zero: choose no coins. For each denomination, update totals upward using ways[a - coin]. Keeping denominations in the outer loop counts combinations rather than different orderings. Complexity is O(coins × amount) time and O(amount) space.",
@@ -591,7 +591,7 @@ CODING_ARCHETYPES = [
         "starter_code": "def can_segment(text: str, words: set[str]) -> bool:\n    pass",
         "criteria": [
             {"label": "Uses prefix reachability or memoized subproblems", "keywords": ["reachable", "dp", "memo", "dynamic programming"]},
-            {"label": "Checks candidate word boundaries", "keywords": ["substring", "text[start:end]", "prefix", "boundary"]},
+            {"label": "Checks candidate word boundaries", "keywords": ["substring", "text[start:end]", "prefix", "boundary", "startswith(", "text[i:j]", "text[j:i]", "text[:"], "related": ["split point", "word in words"]},
             {"label": "Handles the empty-string base case", "keywords": ["empty", "reachable[0]", "true", "base case"]},
         ],
         "explanation": "Define reachable[i] to mean the prefix ending before i can be segmented. Start with reachable[0] = True. For each end boundary, look for a prior reachable boundary whose intervening substring is a word. The final state answers the question. This straightforward dynamic program uses O(n) states and O(n²) candidate substrings.",
@@ -606,8 +606,8 @@ CODING_ARCHETYPES = [
         "starter_code": "def longest_unique_substring(text: str) -> int:\n    pass",
         "criteria": [
             {"label": "Uses a sliding window", "keywords": ["window", "start", "left"]},
-            {"label": "Tracks previous character positions", "keywords": ["last_seen", "index", "position"]},
-            {"label": "Moves the left boundary past duplicates", "keywords": ["max(", "+ 1", "duplicate"]},
+            {"label": "Tracks previous character positions", "keywords": ["last_seen", "index", "position"], "alternatives": [{"label": "Tracks the current window with a set", "keywords": ["set(", ".remove(", ".discard("]}]},
+            {"label": "Moves the left boundary past duplicates", "keywords": ["max(", "+ 1", "duplicate"], "related": ["left += 1"], "alternatives": [{"label": "Shrinks the window with a set", "keywords": [".remove(", ".discard(", "shrink", "while char in", "while c in", "while ch in"]}]},
         ],
         "explanation": "Maintain a window with unique characters and a map from each character to its latest index. When a repeated character falls inside the window, move the left boundary just past its previous occurrence. Each character is processed once, for O(n) time and O(k) space.",
         "solution": "def longest_unique_substring(text):\n    last_seen = {}\n    start = longest = 0\n    for index, char in enumerate(text):\n        if char in last_seen and last_seen[char] >= start:\n            start = last_seen[char] + 1\n        last_seen[char] = index\n        longest = max(longest, index - start + 1)\n    return longest",
@@ -622,7 +622,7 @@ CODING_ARCHETYPES = [
         "criteria": [
             {"label": "Tracks best subarray ending here", "keywords": ["current", "ending", "max("]},
             {"label": "Chooses restart or extension", "keywords": ["current +", "restart", "value"]},
-            {"label": "Handles all-negative arrays", "keywords": ["values[0]", "all negative", "non-empty"]},
+            {"label": "Handles all-negative arrays", "keywords": ["values[0]", "all negative", "non-empty", "-inf", "values[:1]", "first element", "first value", "all-negative", "only negative", "every value is negative", "all values are negative"]},
         ],
         "explanation": "Kadane's algorithm records the best sum ending at each position: either start a new subarray at the current value or extend the previous one. Track the best value seen overall. Initializing from the first item, rather than zero, handles all-negative input. Time is O(n), space O(1).",
         "solution": "def max_subarray_sum(values):\n    current = best = values[0]\n    for value in values[1:]:\n        current = max(value, current + value)\n        best = max(best, current)\n    return best",
@@ -637,7 +637,7 @@ CODING_ARCHETYPES = [
         "criteria": [
             {"label": "Counts occurrences", "keywords": ["counter", "count", "frequency"]},
             {"label": "Defines deterministic tie order", "keywords": ["first", "stable", "order", "tie"]},
-            {"label": "Returns exactly k values", "keywords": ["[:k]", "k values"]},
+            {"label": "Returns exactly k values", "keywords": ["[:k]", "k values"], "related": ["top k", "first k"], "alternatives": [{"label": "Takes the top k with a library helper or slice", "keywords": ["most_common(", "islice(", "[0:k]", "nlargest("]}]},
         ],
         "explanation": "Count each value, then sort distinct values by descending count and first-seen position. Explicitly encoding the tie-break makes output deterministic. This simple implementation is O(n + u log u) for u distinct values, with O(u) extra space.",
         "solution": "from collections import Counter\n\ndef top_k_frequent(values, k):\n    counts = Counter(values)\n    first_seen = {value: index for index, value in reversed(list(enumerate(values)))}\n    return sorted(counts, key=lambda value: (-counts[value], first_seen[value]))[:k]",

@@ -36,7 +36,7 @@ QUESTION_BANK = [
         "mode": "Theory",
         "prompt": "Why are mutable default arguments risky, and what is the idiomatic alternative?",
         "criteria": [
-            {"label": "Defaults evaluated once", "keywords": ["once", "definition", "function defined", "function is defined"]},
+            {"label": "Defaults evaluated once", "keywords": ["once", "definition", "function defined", "function is defined", "def time", "function is created", "function created", "function creation"], "related": ["creation", "only one", "single"]},
             {"label": "Shared object across calls", "keywords": ["shared", "same object", "calls", "persistent"]},
             {"label": "None sentinel pattern", "keywords": ["none", "sentinel", "initialize", "inside"]},
         ],
@@ -50,7 +50,7 @@ QUESTION_BANK = [
         "prompt": "Write a function that returns the first character in a string that appears only once. Return None if every character repeats.",
         "criteria": [
             {"label": "Counts occurrences", "keywords": ["counter", "count", "frequency", ".count("]},
-            {"label": "Preserves input order", "keywords": ["for char", "for character", "for item", "enumerate"]},
+            {"label": "Preserves input order", "keywords": ["for char", "for character", "for item", "enumerate", "for c in", "for ch in"]},
             {"label": "Handles no unique character", "keywords": ["none", "return none"]},
         ],
         "explanation": "Count each character, then scan the original string from left to right and return the first with count one. This preserves the required order. A Counter-based implementation runs in O(n) time and O(k) extra space, where k is the number of distinct characters.",
@@ -132,7 +132,7 @@ QUESTION_BANK = [
         "criteria": [
             {"label": "Documents intended types", "keywords": ["document", "intent", "readability", "metadata"]},
             {"label": "Supports static tooling", "keywords": ["type checker", "static analysis", "ide", "tooling"]},
-            {"label": "Does not enforce types by default", "keywords": ["not enforce", "do not enforce", "runtime", "no runtime"]},
+            {"label": "Does not enforce types by default", "keywords": ["not enforce", "do not enforce", "runtime", "no runtime", "doesn't enforce", "don't enforce", "doesn’t enforce", "don’t enforce", "doesnt enforce", "dont enforce", "just hints", "only hints", "hints only"]},
         ],
         "explanation": "Annotations communicate intended types and can power static checkers, IDEs, documentation, and frameworks. Python does not normally reject a call just because its values disagree with annotations; runtime validation requires separate code or a library. Annotations are metadata, not a substitute for input validation.",
         "solution": "Annotations document the intended types and let a type checker, IDE or other static analysis tooling catch mistakes. They are metadata: Python does not enforce them at runtime (nothing is checked at the call boundary), so repeat('ha', 'three') is only caught when text * count fails inside the function. Validate input explicitly when it matters.\n\ndef repeat(text: str, count: int = 1) -> str:\n    return text * count",
@@ -202,7 +202,7 @@ QUESTION_BANK = [
         "prompt": "Given a list of integers, return a new list containing the square of each even value, keeping the original order.",
         "criteria": [
             {"label": "Filters even values", "keywords": ["% 2", "even", "if "]},
-            {"label": "Squares each selected value", "keywords": ["** 2", "* value", "square"]},
+            {"label": "Squares each selected value", "keywords": ["** 2", "* value", "square", "**2", "pow("], "related": ["* x", "*x", "n * n", "n*n"]},
             {"label": "Preserves order in a new result", "keywords": ["list comprehension", "for value", "append", "return"]},
         ],
         "explanation": "A list comprehension can express the mapping and filter in one readable pass. The condition keeps values divisible by two, and the expression squares each one. It preserves encounter order and leaves the input list unchanged. The time and output space are both O(n).",
@@ -216,7 +216,7 @@ QUESTION_BANK = [
         "prompt": "Write a palindrome check that ignores letter case, spaces, and punctuation. Treat an empty normalized string as a palindrome.",
         "criteria": [
             {"label": "Normalizes case and filters characters", "keywords": ["casefold", "lower(", "isalnum", "alphanumeric"]},
-            {"label": "Compares against the reverse", "keywords": ["[::-1]", "reverse", "two pointer", "two-pointer"]},
+            {"label": "Compares against the reverse", "keywords": ["[::-1]", "reverse", "two pointer", "two-pointer", "left < right", "i < j"], "related": ["from both ends"]},
             {"label": "Handles empty input", "keywords": ["empty", "''", "\"\"", "true"]},
         ],
         "explanation": "Normalize once by retaining alphanumeric characters and applying case folding. A string equals its reverse exactly when it is a palindrome. The empty normalized string compares equal to its reverse, matching the stated convention. The straightforward solution uses O(n) time and O(n) extra space.",
@@ -229,7 +229,7 @@ QUESTION_BANK = [
         "mode": "Theory",
         "prompt": "How do shallow and deep copies differ when an object contains nested mutable values?",
         "criteria": [
-            {"label": "Both create an outer copy", "keywords": ["outer", "top-level", "new object"]},
+            {"label": "Both create an outer copy", "keywords": ["outer", "top-level", "new object", "new list", "new container", "separate copy", "copy of the list", "copy of the dict", "copy of the container", "copy of the outer", "copy of the top", "new outer"]},
             {"label": "Shallow copy shares nested references", "keywords": ["shallow", "shares", "reference", "nested"]},
             {"label": "Deep copy recursively copies nested objects", "keywords": ["deepcopy", "recursive", "recursively", "independent"]},
         ],
@@ -268,7 +268,7 @@ QUESTION_BANK = [
         "mode": "Coding",
         "prompt": "Implement binary search on an ascending sorted list. Return an index containing target, or -1 if it is absent.",
         "criteria": [
-            {"label": "Uses a bounded search interval", "keywords": ["left", "right", "low", "high"]},
+            {"label": "Uses a bounded search interval", "keywords": ["left", "right", "low", "high", "lo =", "hi =", "lo, hi", "lo=", "hi=", "start =", "end ="], "alternatives": [{"label": "Uses the bisect module", "keywords": ["bisect"]}]},
             {"label": "Halves the interval using the midpoint", "keywords": ["mid", "middle", "// 2"]},
             {"label": "Terminates for absent values", "keywords": ["return -1", "while left <= right", "while low <= high"]},
         ],
@@ -283,7 +283,7 @@ QUESTION_BANK = [
         "prompt": "A list contains distinct integers from 1 through n except for one missing value. Return the missing value.",
         "criteria": [
             {"label": "Derives n from the input length", "keywords": ["len(", "length", "n ="]},
-            {"label": "Computes expected versus observed values", "keywords": ["sum(", "expected", "actual", "arithmetic"]},
+            {"label": "Computes expected versus observed values", "keywords": ["sum(", "expected", "actual", "arithmetic"], "related": ["n * (n + 1)", "n*(n+1)", "gauss"], "alternatives": [{"label": "Cancels pairs with XOR", "keywords": ["xor", "^=", " ^ "]}]},
             {"label": "Returns the absent number and handles the smallest case", "keywords": ["return", "missing", "empty", "1"]},
         ],
         "explanation": "With one missing value and no duplicates, n is len(values) + 1. The expected sum is n(n+1)/2, so subtracting the observed sum yields the missing number. This runs in O(n) time and O(1) auxiliary space; the input constraints are essential to the reasoning.",
@@ -312,7 +312,7 @@ QUESTION_BANK = [
         "criteria": [
             {"label": "Reference counts reclaim unreferenced objects", "keywords": ["reference count", "reference counting", "zero references"]},
             {"label": "Cycles can keep reference counts nonzero", "keywords": ["cycle", "cyclic", "reference to each other"]},
-            {"label": "Cyclic collector supplements reference counting", "keywords": ["cyclic garbage collector", "gc module", "garbage collector"]},
+            {"label": "Cyclic collector supplements reference counting", "keywords": ["cyclic garbage collector", "gc module", "garbage collector", "garbage collection", "gc.collect", "the gc ", "the gc.", "the gc,", "generational"], "related": ["collector"]},
         ],
         "explanation": "In CPython, reference counting promptly reclaims objects whose strong-reference count reaches zero. A cycle of objects can retain references to one another even when the group is unreachable from the program, so reference counting alone cannot reclaim it. The cyclic garbage collector detects collectable cycles. Collection timing and implementation details are not guarantees of the Python language specification.",
         "solution": "import gc\n\n# The gc module can inspect or trigger cyclic collection, but ordinary code should usually manage ownership clearly rather than force collection.",
@@ -325,7 +325,7 @@ QUESTION_BANK = [
         "criteria": [
             {"label": "Changes a class or module at runtime", "keywords": ["runtime", "at runtime", "replace", "modify"]},
             {"label": "Can create hidden global or order-dependent behavior", "keywords": ["global", "hidden", "order", "surprise"]},
-            {"label": "Prefers scoped patches or dependency injection", "keywords": ["dependency injection", "mock", "scoped", "patch.object"]},
+            {"label": "Prefers scoped patches or dependency injection", "keywords": ["dependency injection", "mock", "scoped", "patch.object", "monkeypatch.setattr", "pytest monkeypatch", "monkeypatch fixture", "pytest fixture", "context manager"], "related": ["wrapper", "subclass"]},
         ],
         "explanation": "Monkey patching replaces or adds an attribute on an imported module or class at runtime. It can be useful in tightly scoped tests or compatibility shims, but global patches make behavior depend on import and execution order and can affect unrelated code. Prefer explicit dependency injection or a scoped mock where possible.",
         "solution": "Monkey patching replaces or modifies a module or class attribute at runtime. It is risky because the change is global and hidden: behavior depends on import and execution order and can surprise unrelated code. Prefer dependency injection or a scoped mock:\n\nfrom unittest.mock import patch\n\nwith patch('service.fetch_data', return_value=[]):\n    result = service.build_report()",
@@ -349,8 +349,8 @@ QUESTION_BANK = [
         "mode": "Coding",
         "prompt": "Given distinct positive coin values and a non-negative amount, return the number of unordered combinations that make that amount. Each coin can be used repeatedly.",
         "criteria": [
-            {"label": "Uses a one-dimensional ways table", "keywords": ["ways =", "dp =", "amount + 1", "dynamic programming"]},
-            {"label": "Initializes one way to make zero", "keywords": ["ways[0] = 1", "dp[0] = 1", "zero amount"]},
+            {"label": "Uses a one-dimensional ways table", "keywords": ["ways =", "dp =", "amount + 1", "dynamic programming", "[0] * (amount", "[0]*(amount", "dp=", "ways=", "table =", "table="], "related": ["array", "list of size"]},
+            {"label": "Initializes one way to make zero", "keywords": ["ways[0] = 1", "dp[0] = 1", "zero amount", "[0]=1", "[0] = 1", "[1] + [0]"], "related": ["base case", "zero ways"]},
             {"label": "Processes coins outside ascending subtotals", "keywords": ["for coin", "for amount", "range(coin", "combinations"]},
         ],
         "explanation": "Let ways[a] count combinations that make amount a. There is one way to make zero: choose no coins. For each coin, update totals from that coin upward using ways[a - coin]. Keeping the coin loop outermost counts combinations without treating different coin orders as distinct. Complexity is O(number of coins × amount) time and O(amount) space.",
@@ -364,7 +364,7 @@ QUESTION_BANK = [
         "prompt": "Given a string and a set of words, determine whether the string can be split into one or more dictionary words. The empty string is segmentable.",
         "criteria": [
             {"label": "Uses prefix reachability or memoized subproblems", "keywords": ["reachable", "dp", "memo", "dynamic programming"]},
-            {"label": "Checks candidate word boundaries", "keywords": ["substring", "text[start:end]", "prefix", "boundary"]},
+            {"label": "Checks candidate word boundaries", "keywords": ["substring", "text[start:end]", "prefix", "boundary", "startswith(", "text[i:j]", "text[j:i]", "text[:"], "related": ["split point", "word in words"]},
             {"label": "Handles the empty suffix/base case", "keywords": ["empty", "reachable[0]", "true", "base case"]},
         ],
         "explanation": "Define reachable[i] to mean the prefix before i can be segmented. Start with reachable[0] = True. For each end position, look for a prior reachable boundary whose intervening substring is a dictionary word. The final state answers the question. This dynamic program uses O(n) states and O(n²) candidate substrings, ignoring substring/hash costs.",
@@ -377,7 +377,7 @@ QUESTION_BANK = [
         "mode": "Coding",
         "prompt": "Given daily prices, return the maximum profit from one buy followed by one later sell. Return zero if no profitable trade exists.",
         "criteria": [
-            {"label": "Tracks the lowest earlier price", "keywords": ["minimum", "min_price", "lowest", "buy"]},
+            {"label": "Tracks the lowest earlier price", "keywords": ["minimum", "min_price", "lowest", "buy", "min(", "min_so_far", "cheapest", "smallest", "low ="]},
             {"label": "Computes profit before updating the minimum", "keywords": ["price -", "profit", "sell"]},
             {"label": "Handles short or decreasing input", "keywords": ["zero", "max(0", "empty", "len("]},
         ],
