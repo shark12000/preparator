@@ -284,7 +284,8 @@ def theory_library():
     rows = db.get_db().execute(
         """SELECT q.id, q.topic, q.difficulty, q.prompt AS title, q.criteria,
               q.explanation, q.solution AS example, COALESCE(s.note, '') AS note,
-                  (COALESCE(s.saved, 0) = 1) AS saved
+                  (COALESCE(s.saved, 0) = 1) AS saved,
+                  EXISTS (SELECT 1 FROM attempts a WHERE a.question_id = q.id) AS unlocked
            FROM questions q LEFT JOIN saved_lessons s ON s.question_id = q.id
            WHERE q.mode = 'Theory' AND """ + db.ACTIVE_QUESTION + " AND " + db.CANONICAL_QUESTION + """
            ORDER BY q.topic, q.difficulty, q.id"""
@@ -292,8 +293,16 @@ def theory_library():
     lessons = []
     for row in rows:
         lesson = dict(row)
-        lesson["key_points"] = [item["label"] for item in json.loads(lesson.pop("criteria"))]
+        criteria = json.loads(lesson.pop("criteria"))
         lesson["saved"] = bool(lesson["saved"])
+        lesson["unlocked"] = bool(lesson["unlocked"])
+        if lesson["unlocked"]:
+            lesson["key_points"] = [item["label"] for item in criteria]
+        else:
+            # ADR-001: a locked lesson carries no answer content in any response.
+            lesson["explanation"] = None
+            lesson["example"] = None
+            lesson["key_points"] = []
         lessons.append(lesson)
     return jsonify({"lessons": lessons, "saved_count": sum(lesson["saved"] for lesson in lessons)})
 
@@ -352,7 +361,11 @@ def spreadsheet_safe(value):
 @app.get("/api/theory/export.csv")
 def export_saved_theory():
     rows = db.get_db().execute(
-        """SELECT q.topic, q.difficulty, q.prompt, q.explanation, q.solution,
+        """SELECT q.topic, q.difficulty, q.prompt,
+                  CASE WHEN EXISTS (SELECT 1 FROM attempts a WHERE a.question_id = q.id)
+                       THEN q.explanation ELSE '' END,
+                  CASE WHEN EXISTS (SELECT 1 FROM attempts a WHERE a.question_id = q.id)
+                       THEN q.solution ELSE '' END,
                   s.note, s.saved_at
            FROM saved_lessons s JOIN questions q ON q.id = s.question_id
            WHERE s.saved = 1

@@ -1913,5 +1913,76 @@ class PreparatorTests(unittest.TestCase):
             self.assertNotEqual(response.get_json()["question"]["id"], left_out)
 
 
+class LockedLessonTests(unittest.TestCase):
+    """TASK-004 / ADR-001 option A: a Theory lesson's answer content is locked until attempted."""
+
+    def setUp(self):
+        self.database = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115 - must outlive the with-block
+        self.database.close()
+        preparator.app.config.update(TESTING=True, DATABASE=self.database.name)
+        with preparator.app.app_context():
+            db.init_db()
+        self.client = preparator.app.test_client()
+
+    def tearDown(self):
+        os.unlink(self.database.name)
+
+    def _lessons(self):
+        return self.client.get("/api/theory").get_json()["lessons"]
+
+    def _csv_rows(self):
+        text = self.client.get("/api/theory/export.csv").data.decode("utf-8-sig")
+        return list(csv.reader(io.StringIO(text, newline="")))
+
+    def test_fresh_database_lessons_are_all_locked_and_leak_nothing(self):
+        response = self.client.get("/api/theory")
+        lessons = response.get_json()["lessons"]
+        self.assertTrue(lessons)
+        for lesson in lessons:
+            self.assertIs(lesson["unlocked"], False)
+            self.assertIsNone(lesson["explanation"])
+            self.assertIsNone(lesson["example"])
+            self.assertEqual(lesson["key_points"], [])
+        text = response.get_data(as_text=True)
+        for question in QUESTION_BANK:
+            if question["mode"] == "Theory":
+                self.assertNotIn(json.dumps(question["solution"])[1:-1], text)
+                self.assertNotIn(json.dumps(question["explanation"])[1:-1], text)
+
+    def test_attempt_unlocks_only_that_lesson(self):
+        lessons = self._lessons()
+        target = lessons[0]["id"]
+        response = self.client.post("/api/answer", json={"question_id": target, "answer": "my attempt"})
+        self.assertEqual(response.status_code, 200)
+        for lesson in self._lessons():
+            if lesson["id"] == target:
+                self.assertIs(lesson["unlocked"], True)
+                self.assertTrue(lesson["explanation"])
+                self.assertTrue(lesson["example"])
+                self.assertTrue(lesson["key_points"])
+            else:
+                self.assertIs(lesson["unlocked"], False)
+                self.assertIsNone(lesson["explanation"])
+                self.assertEqual(lesson["key_points"], [])
+
+    def test_csv_cells_are_empty_until_the_lesson_is_attempted(self):
+        qid = self._lessons()[0]["id"]
+        self.client.post(f"/api/theory/{qid}", json={"note": "mine"})
+        rows = self._csv_rows()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual((rows[1][3], rows[1][4], rows[1][5]), ("", "", "mine"))
+        self.client.post("/api/answer", json={"question_id": qid, "answer": "my attempt"})
+        row = self._csv_rows()[1]
+        self.assertTrue(row[3])
+        self.assertTrue(row[4])
+
+    def test_question_response_has_no_answer_keys(self):
+        qid = self._lessons()[0]["id"]
+        body = self.client.post("/api/question", json={"question_id": qid}).get_json()
+        for key in ("solution", "explanation", "criteria"):
+            self.assertNotIn(key, body)
+            self.assertNotIn(key, body["question"])
+
+
 if __name__ == "__main__":
     unittest.main()
