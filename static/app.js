@@ -206,7 +206,7 @@ function clearBusy(button) {
   if (label && button.dataset.idleLabel !== undefined) label.textContent = button.dataset.idleLabel;
 }
 
-// The only caller of POST /api/question: Start now; Next (TASK-064) and review entry (TASK-065) later.
+// The only caller of POST /api/question: Start, Next and review entry (TASK-065) all go through it.
 async function requestQuestion({ button, questionId = null, weakOnly = false, errorId = "intro-error" } = {}) {
   const review = questionId !== null || weakOnly;
   if (!review && state.requesting) return;
@@ -300,6 +300,7 @@ async function renderQuestion(question, { fromReview = false } = {}) {
   byId("session-label").textContent = `Question ${state.session.count}`;
   setSavedButtons(false);
   showError("answer-error", "");
+  showError("feedback-error", "");
   byId("answer-area").classList.remove("hidden");
   byId("feedback").classList.add("hidden");
   showState("question");
@@ -753,7 +754,10 @@ document.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (event.key === "?") { event.preventDefault(); dialog.showModal(); }
   else if (/^[1-4]$/.test(key)) setView(VIEWS[Number(key) - 1]);
-  else if (key === "n" && practiceActive && state.question && feedbackShown && !state.requesting) nextQuestion();
+  else if (key === "n" && practiceActive && state.question && feedbackShown && !state.requesting) {
+    byId("next-button").focus();
+    nextQuestion();
+  }
   else if (key === "s" && practiceActive && state.question) saveForReview();
 });
 
