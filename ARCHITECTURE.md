@@ -6,7 +6,8 @@ Preparator is a local, single-process Flask application. Flask serves one HTML p
 
 ## Project Map
 
-- `app.py` contains Flask configuration, SQLite setup, request handlers, rubric scoring, and CSV export.
+- `app.py` contains Flask configuration, the localhost guard and error handler, request handlers (HTTP validation and responses), rubric scoring, question selection, the streak, and CSV export. It reaches the database only through `db` (`import db`, qualified names such as `db.get_db()`).
+- `db.py` (ADR-015, TASK-051) owns the SQLite side: the connection lifecycle (`get_db`, `close_db`, registered on the app by `init_app`), the versioned migrations (`MIGRATIONS`, `run_migrations`, `SchemaTooNewError`), one-time initialization and seeding (`init_db`, `seed_questions`), `utc_now`, and the shared SQL predicates `CANONICAL_QUESTION` and `ACTIVE_QUESTION`. It never imports `app`. Tests patch these names on `db`, never on `app`.
 - `question_bank.py` holds the hand-written prompts and appends the generated coding variants into `QUESTION_BANK`.
 - `coding_variants.py` generates 312 deterministic coding prompts from 24 original problem types and varied sample inputs.
 - `templates/index.html` defines the single-page shell and its Practice, Learn, Weak spots, and Progress views.
@@ -14,9 +15,9 @@ Preparator is a local, single-process Flask application. Flask serves one HTML p
 - `static/editor.js` wraps CodeMirror for coding answers; `app.js` imports it lazily and falls back to a textarea if it fails.
 - `static/vendor/codemirror.js` is a prebuilt CodeMirror 6 bundle (see README to rebuild). Do not edit by hand.
 - `static/style.css` defines design tokens (colors, type scale) for light and dark themes, then components and responsive layouts. Use tokens rather than raw hex values.
-- `tests/test_app.py` exercises API behavior with an isolated temporary SQLite database. `tests/test_bank_determinism.py` checks that bank identities do not depend on the hash seed, and `tests/bank_identities.json` (written by `tests/bank_identities.py`) pins the current identities (ADR-005 addendum).
+- `tests/test_app.py` exercises API behavior with an isolated temporary SQLite database. `tests/test_rubric.py` covers the graded rubric (criterion states, scores, the bank shape of `related` and `alternatives`) and the `concepts` field of `POST /api/answer` (TASK-067, TASK-092). `tests/test_bank_determinism.py` checks that bank identities do not depend on the hash seed, and `tests/bank_identities.json` (written by `tests/bank_identities.py`) pins the current identities (ADR-005 addendum).
 - `instance/preparator.sqlite3` is the local persistent database. Do not use it as a test database.
-- `requirements.txt` lists the Python runtime dependency; `requirements-dev.txt` lists development-only tools (Playwright for the browser checks in `tools/qa/`). `.vscode/tasks.json` provides the local run task.
+- `requirements.txt` lists the Python runtime dependency (`Flask>=3.1,<4`, TASK-019: ADR-002 and the planned per-route body limit of ADR-010 rely on Flask 3.1); `requirements-dev.txt` lists development-only tools (pinned Playwright for the browser checks in `tools/qa/`, pinned ruff for linting, ADR-006). `.vscode/tasks.json` provides the local run task.
 
 ## Data Model
 
@@ -28,7 +29,7 @@ Preparator is a local, single-process Flask application. Flask serves one HTML p
 - `review_schedule` (planned, ADR-008, migration step 5, TASK-083) holds one spaced-repetition row per answered question (`interval_days`, local `due_date`). It is separate from `weaknesses`: neither reads or writes the other.
 - `saved_lessons` stores theory question IDs with a personal note, a `saved` flag, and a save timestamp. Unsaving a lesson clears the flag and keeps a non-empty note (ADR-004).
 
-Schema changes go through the versioned migrations in `app.py` (`MIGRATIONS`, tracked in `PRAGMA user_version`, ADR-003). Steps are additive only: new tables, new columns with defaults, new indexes; they never rewrite or drop user data. A database whose version is newer than the code is refused rather than used (ADR-014, TASK-050): `python app.py` exits with a message, and other runners fail every database route with the generic 500 and write nothing.
+Schema changes go through the versioned migrations in `db.py` (`MIGRATIONS`, tracked in `PRAGMA user_version`, ADR-003). Steps are additive only: new tables, new columns with defaults, new indexes; they never rewrite or drop user data. A database whose version is newer than the code is refused rather than used (ADR-014, TASK-050): `python app.py` exits with a message, and other runners fail every database route with the generic 500 and write nothing.
 
 Progress backup (ADR-010, planned: TASK-086 export, TASK-087 import) is a JSON file that refers to questions by identity, never by row id. Import is the only path where outside data enters the database, so it is validated all-or-nothing and merges without deleting.
 
@@ -51,8 +52,8 @@ Browser `localStorage` holds volatile UI state only; SQLite holds all durable pr
    Status: implemented (server TASK-061, intro TASK-063). Planned: `due_only` serves questions due for review today, with no fallback when none are due (ADR-008, PLANNED-17, TASK-084).
 3. `POST /api/answer` applies a keyword rubric, stores the attempt, updates the weakness queue, and returns per-concept states (covered, partly covered, not detected; no "wrong" state) with matched terms, the attempt id, `previous_score`, theory, and the example solution (ADR-017, TASK-067). `POST`/`DELETE /api/attempts/<id>/overrides` record "I covered this" without changing the score (TASK-068). The feedback UI for concept states and overrides is TASK-075 to 077. Planned: `schedule` (next review date) in the response (PLANNED-16, TASK-083).
 4. `GET /api/dashboard` returns totals, per-topic and topic × level averages, a daily trend (local dates), the practice streak, weak spots, and recent attempts.
-5. `GET /api/theory` lists theory-mode questions as lessons. `POST` and `DELETE /api/theory/<id>` save or remove a lesson; saved notes are updated through the same `POST` endpoint. Planned (ADR-001 option A, accepted 2026-10-05; PLANNED-8, TASK-004 to 006): a lesson's explanation, model answer and key points stay locked until its question has at least one attempt.
-6. `GET /api/theory/export.csv` exports saved lessons and notes as formula-neutralized CSV for import into Google Sheets. There is no OAuth or automatic spreadsheet sync.
+5. `GET /api/theory` lists theory-mode questions as lessons. `POST` and `DELETE /api/theory/<id>` save or remove a lesson; saved notes are updated through the same `POST` endpoint. A lesson's explanation, model answer and key points stay locked until its question (that row id) has at least one attempt (ADR-001 option A; server and CSV implemented by TASK-004; the locked-lesson UI is TASK-006, designed in TASK-005).
+6. `GET /api/theory/export.csv` exports saved lessons and notes (Explanation and Example empty while a lesson is locked) as formula-neutralized CSV for import into Google Sheets. There is no OAuth or automatic spreadsheet sync.
 7. Planned: `GET /api/questions/<id>/attempts` returns the user's own earlier answers to one question, never the solution (ADR-011, PLANNED-18, TASK-089). `GET /api/backup.json` and `POST /api/backup/import` back up and merge all progress (ADR-010, PLANNED-19/20, TASK-086/087).
 
 ## Local Development
@@ -60,7 +61,10 @@ Browser `localStorage` holds volatile UI state only; SQLite holds all durable pr
 ```powershell
 python app.py
 python -m unittest discover -s tests
+python -m ruff check app.py db.py question_bank.py coding_variants.py tests
 ```
+
+The lint check is ruff (ADR-006, TASK-019), installed from `requirements-dev.txt`. It runs with ruff's default rule set and no config file, and must exit 0. A finding is fixed, or suppressed inline with `# noqa: <code>` plus a short reason when the fix would change behavior. There is no type checker and no JS linter; JS files are checked with `node --check`.
 
 The default URL is `http://127.0.0.1:5000`. `PORT` changes the listen port; `PREPARATOR_DATABASE` changes the SQLite file path. The Flask development server is intended for local practice only. Debug mode (reloader and interactive debugger) is off unless `FLASK_DEBUG=1` is set (TASK-010); never enable it when anything other than you can reach the port.
 
@@ -84,9 +88,9 @@ Keep the current structure while the app remains small. As features grow, refact
 4. Add direct Sheets sync only behind a dedicated integration boundary with explicit authorization; retain CSV export as a credential-free fallback.
 5. Add authentication, CSRF protection, and a production WSGI server before exposing the app beyond localhost.
 
-Status of step 1 (ADR-003): the versioned migration mechanism (`PRAGMA user_version`) is implemented inside `app.py` (TASK-007; schema version 4 after TASK-008, TASK-012 and TASK-068). Moving the database code into its own module was deferred until `app.py` passes about 600 lines; it is now about 800. ADR-015 decides the move: connection, migration and seeding code goes to a new `db.py`, behavior unchanged (TASK-051; unblocked 2026-10-05, `db.py` is in the `CLAUDE.md` write areas). Every new schema step (5 onward) and the review-schedule replay go into `db.py`, so TASK-051 runs before TASK-083.
+Status of step 1 (ADR-003, ADR-015): **done** (2026-10-07). The versioned migration mechanism (`PRAGMA user_version`) came first (TASK-007; schema version 4 after TASK-008, TASK-012 and TASK-068). TASK-051 then moved the connection, migration and seeding code into `db.py`, behavior unchanged; `app.py` went from about 800 to about 600 lines, and `db.py` is about 220. Every new schema step (5 onward) and the review-schedule replay go into `db.py`.
 
-Step 2 was to be revisited when the backup import was designed. Decision 2026-10-05: not yet. The import (TASK-087) is one handler plus a validator and a merge function in `app.py`; splitting services for it alone adds structure before there is a second consumer. Revisit step 2 when `app.py` passes about 1,000 lines after TASK-051 and the backup tasks, or when a second feature needs the same merge or validation code. Step 3 is not started.
+Step 2 was to be revisited when the backup import was designed. Decision 2026-10-05: not yet. The import (TASK-087) is one handler plus a validator and a merge function in `app.py`; splitting services for it alone adds structure before there is a second consumer. Revisit step 2 when `app.py` (about 600 lines after TASK-051) passes about 1,000 lines with the backup tasks, or when a second feature needs the same merge or validation code. Step 3 is not started.
 
 ## Architecture Decisions
 
@@ -94,12 +98,12 @@ Decisions are recorded in `docs/architecture/adr/`. Planned API changes are in `
 
 | ADR | Title | Status |
 |---|---|---|
-| ADR-001 | Learn view exposes Theory answers before submission | Accepted, option A: lock until the first attempt (human decision 2026-10-05; not yet implemented: TASK-004, 005, 006) |
+| ADR-001 | Learn view exposes Theory answers before submission | Accepted, option A: lock until the first attempt (human decision 2026-10-05; backend implemented by TASK-004, design TASK-005 done; frontend TASK-006 not yet done) |
 | ADR-002 | Protect the localhost API from cross-site requests and DNS rebinding | Accepted |
 | ADR-003 | Safe one-time DB initialization and versioned schema migrations | Accepted |
 | ADR-004 | Lesson notes survive "Remove from saved" | Accepted |
 | ADR-005 | Retire question rows that are no longer in the bank | Accepted |
-| ADR-006 | Python lint tooling, and how frontend fixes are verified | Accepted |
+| ADR-006 | Python lint tooling, and how frontend fixes are verified | Accepted (ruff and the Flask `>=3.1,<4` bound implemented by TASK-019; mypy still deferred) |
 | ADR-007 | Practice flow product decisions | Accepted (decisions 1 and 6 superseded, decision 4 reworded by ADR-016) |
 | ADR-008 | Spaced-repetition review schedule, separate from the weak-spot queue | Accepted (not yet implemented: TASK-083, 084 backend, TASK-085 design) |
 | ADR-009 | Source confirmation once per mock-interview session | Superseded by ADR-016 |
@@ -108,8 +112,8 @@ Decisions are recorded in `docs/architecture/adr/`. Planned API changes are in `
 | ADR-012 | Resume an unfinished question after reload, through the search gate | Accepted, amended by ADR-016 (resume is one click, no search; not yet implemented: design TASK-093, after TASK-033) |
 | ADR-013 | Open items from the Learn and Practice designs (notes, weak-spot removal, export, copy) | Accepted (decisions 7 and 9 implemented by TASK-050 and TASK-049; the frontend items are in the Learn and Practice task backlog) |
 | ADR-014 | Refuse to open a database whose schema is newer than the code | Accepted (implemented by TASK-050) |
-| ADR-015 | Move the database code out of `app.py` into `db.py` | Accepted (not yet implemented; TASK-051, unblocked 2026-10-05) |
+| ADR-015 | Move the database code out of `app.py` into `db.py` | Implemented (TASK-051, 2026-10-07) |
 | ADR-016 | Remove the search and source-confirmation step before a question | Accepted (human approval 2026-10-04; changes a guardrail; implemented by TASK-061 and TASK-063; TASK-064 to 066 refine the flow) |
-| ADR-017 | Graded rubric feedback (partial matches, accepted alternatives) and recorded self-assessment | Accepted (no guardrail change; backend implemented by TASK-067, 068, 069; design TASK-070; frontend TASK-075 to 077 and the rubric fixes in TASK-092 not yet done) |
+| ADR-017 | Graded rubric feedback (partial matches, accepted alternatives) and recorded self-assessment | Accepted (no guardrail change; backend implemented by TASK-067, 068, 069, and the rubric fixes by TASK-092; design TASK-070; frontend TASK-075 to 077 not yet done) |
 
 Notes: ADR-008 (2026-10-05) gives the review schedule migration step 5 in `db.py`, replays by `created_at` then `id`, and moves `WEAK_SCORE_THRESHOLD` to `db.py`. ADR-010 (2026-10-05) adds self-assessments to backup format 1. ADR-011 (2026-10-05) keeps history solution-free after ADR-001. ADR-002 and ADR-005 carry 2026-10-04 clarifications (the `[::1]` rationale; the determinism addendum). ADR-001, ADR-007, ADR-009, ADR-011 and ADR-012 carry 2026-10-04 notes pointing to ADR-016.

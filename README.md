@@ -19,7 +19,7 @@ The bank contains the original interview prompts plus 312 deterministic coding v
 
 Coding questions open in a CodeMirror editor with Python highlighting, line numbers, and auto-indent (falling back to a plain text box if it cannot load). Submissions use the app's transparent keyword rubric and reveal the example solution after submission. Lines copied unchanged from the starter stub earn no rubric credit, and an untouched stub cannot be submitted. The app does not execute submitted code.
 
-The Learn view reuses the theory prompts as short lessons, with expandable examples and personal notes. Save a lesson to keep it in the Saved filter. **Export for Sheets** downloads a CSV with the lesson, explanation, example, note, and saved date; import that file into Google Sheets. This avoids storing Google credentials in the app.
+The Learn view reuses the theory prompts as short lessons, with personal notes. A lesson's explanation, example, and key points stay hidden until you have submitted at least one answer to that question in Practice, so you try it before you read the answer; after that they stay visible. Save a lesson to keep it in the Saved filter. **Export for Sheets** downloads a CSV with the lesson, explanation, example, note, and saved date (the explanation and example cells are empty for lessons you have not answered yet); import that file into Google Sheets. This avoids storing Google credentials in the app.
 
 ## Interface
 
@@ -47,6 +47,13 @@ Answer feedback uses a small, visible concept-keyword rubric. A concept counts a
 
 ```powershell
 python -m unittest discover -s tests
+```
+
+Development tools (the ruff linter and Playwright for browser checks) are listed separately and are not needed to run the app:
+
+```powershell
+pip install -r requirements-dev.txt
+python -m ruff check app.py db.py question_bank.py coding_variants.py tests
 ```
 
 ## Next features to explore
