@@ -2,7 +2,6 @@
 
 from coding_variants import build_coding_variants
 
-
 QUESTION_BANK = [
     {
         "topic": "Python Core",

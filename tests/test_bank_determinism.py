@@ -38,7 +38,7 @@ def run_python(script, hash_seed, database=None):
         env["PREPARATOR_DATABASE"] = database
     result = subprocess.run(
         [sys.executable, "-c", script], cwd=ROOT, env=env,
-        capture_output=True, text=True, timeout=120,
+        capture_output=True, text=True, timeout=120, check=False,
     )
     if result.returncode != 0:
         raise AssertionError(result.stderr)

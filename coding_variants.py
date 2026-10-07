@@ -1,7 +1,6 @@
 from collections import Counter, deque
 from math import factorial
 
-
 VARIATIONS_PER_ARCHETYPE = 13
 
 

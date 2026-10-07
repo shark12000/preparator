@@ -114,7 +114,7 @@ class EvaluateAnswerTests(unittest.TestCase):
 
 class AnswerEndpointTests(unittest.TestCase):
     def setUp(self):
-        self.database = tempfile.NamedTemporaryFile(delete=False)
+        self.database = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115 - must outlive the with-block
         self.database.close()
         preparator.app.config.update(TESTING=True, DATABASE=self.database.name)
         with preparator.app.app_context():
@@ -340,8 +340,8 @@ STRICT_RUBRIC_ROWS = {
         "added": ["-inf", "values[:1]", "first element", "first value", "all-negative", "only negative",
                   "every value is negative", "all values are negative"],
         "negatives": [
-            ("current = best = 0\nfor v in values:\n    current = max(0, current + v)  # reset when negative\n"
-             "    best = max(best, current)\nreturn best", "not_detected"),
+            (("current = best = 0\nfor v in values:\n    current = max(0, current + v)  # reset when negative\n"
+              "    best = max(best, current)\nreturn best"), "not_detected"),
             ("restart from zero when the running sum goes negative", "not_detected"),
         ],
     },

@@ -4,3 +4,6 @@
 
 # Headless browser checks for the qa-engineer (tools/qa/qa_browser.py)
 playwright==1.63.0
+
+# Linter (default rule set, no config file): ruff check app.py db.py question_bank.py coding_variants.py tests
+ruff==0.16.10

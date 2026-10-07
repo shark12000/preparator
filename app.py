@@ -9,8 +9,8 @@ from urllib.parse import urlparse
 
 from flask import Flask, Response, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
-import db
 
+import db
 
 app = Flask(__name__)
 app.config["DATABASE"] = os.environ.get(
@@ -269,7 +269,7 @@ def dashboard():
 
 def practice_streak(practice_days, today=None):
     """Count consecutive practice days ending today (or yesterday, if today is still open)."""
-    today = today or date.today()
+    today = today or date.today()  # noqa: DTZ011 - practice days are local calendar dates by design
     practiced = {date.fromisoformat(day) for day in practice_days}
     cursor = today if today in practiced else today - timedelta(days=1)
     streak = 0

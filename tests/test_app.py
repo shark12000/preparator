@@ -11,17 +11,18 @@ import threading
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
 from unittest import mock
+
 import app as preparator
 import db
 from question_bank import QUESTION_BANK
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import bank_identities  # noqa: E402
+import bank_identities
 
 
 class PreparatorTests(unittest.TestCase):
     def setUp(self):
-        self.database = tempfile.NamedTemporaryFile(delete=False)
+        self.database = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115 - must outlive the with-block
         self.database.close()
         preparator.app.config.update(TESTING=True, DATABASE=self.database.name)
         with preparator.app.app_context():
@@ -44,7 +45,6 @@ class PreparatorTests(unittest.TestCase):
     DICT_PROMPT = "What happens when a dictionary key is missing, and how can you handle an optional key safely?"
 
     def _dict_criteria(self):
-        from question_bank import QUESTION_BANK
         return next(q for q in QUESTION_BANK if q["prompt"] == self.DICT_PROMPT)["criteria"]
 
     def test_dict_missing_key_real_answer_earns_partial_and_eafp(self):
@@ -122,7 +122,7 @@ class PreparatorTests(unittest.TestCase):
             database = db.get_db()
             qid = database.execute("SELECT id FROM questions WHERE retired = 0 LIMIT 1").fetchone()[0]
             for offset in offsets:
-                local_noon = datetime.combine(date.today() - timedelta(days=offset), at or time(12)).astimezone()
+                local_noon = datetime.combine(date.today() - timedelta(days=offset), at or time(12)).astimezone()  # noqa: DTZ011 - local date by design
                 database.execute(
                     "INSERT INTO attempts (question_id, answer, score, created_at) VALUES (?, 'x', 5, ?)",
                     (qid, local_noon.astimezone(timezone.utc).isoformat(timespec="seconds")),
@@ -631,7 +631,7 @@ class PreparatorTests(unittest.TestCase):
             barrier = threading.Barrier(len(urls))
             results = [None] * len(urls)
 
-            def fire(index, url):
+            def fire(index, url, barrier=barrier, results=results):
                 client = preparator.app.test_client()
                 barrier.wait(timeout=10)
                 response = client.get(url)
@@ -665,8 +665,10 @@ class PreparatorTests(unittest.TestCase):
             return real_init()
 
         client = preparator.app.test_client()
-        with mock.patch.dict(preparator.app.config, {"PROPAGATE_EXCEPTIONS": False}), \
-                mock.patch.object(db, "init_db", flaky_init):
+        with (
+            mock.patch.dict(preparator.app.config, {"PROPAGATE_EXCEPTIONS": False}),
+            mock.patch.object(db, "init_db", flaky_init),
+        ):
             self.assertEqual(client.get("/api/dashboard").status_code, 500)
             self.assertNotIn(path, db._initialized_databases)
             self.assertEqual(client.get("/api/dashboard").status_code, 200)
@@ -789,9 +791,11 @@ class PreparatorTests(unittest.TestCase):
             raise RuntimeError("boom")
 
         migrations = db.MIGRATIONS + [(len(db.MIGRATIONS) + 1, step_3)]
-        with mock.patch.object(db, "MIGRATIONS", migrations):
-            with self.assertRaises(RuntimeError):
-                self._run_init(path)
+        with (
+            mock.patch.object(db, "MIGRATIONS", migrations),
+            self.assertRaises(RuntimeError),
+        ):
+            self._run_init(path)
         self.assertEqual(self._schema_snapshot(path), before)
 
     def test_failing_step_on_old_database_leaves_it_untouched(self):
@@ -806,9 +810,11 @@ class PreparatorTests(unittest.TestCase):
             database.execute("CREATE TABLE attempts (id INTEGER)")
             raise RuntimeError("boom")
 
-        with mock.patch.object(db, "MIGRATIONS", [(1, broken)]):
-            with self.assertRaises(RuntimeError):
-                self._run_init(path)
+        with (
+            mock.patch.object(db, "MIGRATIONS", [(1, broken)]),
+            self.assertRaises(RuntimeError),
+        ):
+            self._run_init(path)
         self.assertEqual(self._schema_snapshot(path), before)
         self.assertEqual(before[2], 0)
 
@@ -823,9 +829,11 @@ class PreparatorTests(unittest.TestCase):
             raise RuntimeError("boom")
 
         migrations = db.MIGRATIONS + [(len(db.MIGRATIONS) + 1, boom)]
-        with mock.patch.object(db, "MIGRATIONS", migrations):
-            with self.assertRaises(RuntimeError):
-                self._run_init(path)
+        with (
+            mock.patch.object(db, "MIGRATIONS", migrations),
+            self.assertRaises(RuntimeError),
+        ):
+            self._run_init(path)
         connection = sqlite3.connect(path)
         try:
             self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 0)
@@ -855,10 +863,12 @@ class PreparatorTests(unittest.TestCase):
         preparator.app.config["DATABASE"] = path
         with preparator.app.app_context():
             real = db.get_db()
-            with mock.patch.object(db, "run_migrations", boom), \
-                    mock.patch.object(db, "get_db", lambda: FailingRollback(real)):
-                with self.assertRaises(RuntimeError) as caught:
-                    db.init_db()
+            with (
+                mock.patch.object(db, "run_migrations", boom),
+                mock.patch.object(db, "get_db", lambda: FailingRollback(real)),
+                self.assertRaises(RuntimeError) as caught,
+            ):
+                db.init_db()
         self.assertEqual(str(caught.exception), "original")
 
     def _newer_database(self):
@@ -943,9 +953,11 @@ class PreparatorTests(unittest.TestCase):
             connection.set_trace_callback(statements.append)
             return connection
 
-        with mock.patch.object(db.sqlite3, "connect", traced_connect):
-            with self.assertRaises(db.SchemaTooNewError):
-                self._run_init(path)
+        with (
+            mock.patch.object(db.sqlite3, "connect", traced_connect),
+            self.assertRaises(db.SchemaTooNewError),
+        ):
+            self._run_init(path)
         self.assertIn("PRAGMA user_version", statements)
         writes = ("INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "REPLACE")
         for statement in statements:
@@ -1088,7 +1100,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(self.client.delete(f"/api/theory/{qid}").get_json(), {"saved": False})
 
     # ---- TASK-012 / ADR-005: retired rows ----
-    SEARCH = {
+    SEARCH = {  # noqa: RUF012 - read-only constant
         "source_confirmed": True,
         "source_url": "https://www.google.com/search?q=python",
         "search_query": "Python interview questions",
@@ -1112,9 +1124,11 @@ class PreparatorTests(unittest.TestCase):
     def _retire_edited(self):
         bank, old = self._edited_bank()
         ids = self._ids(old.values())
-        with mock.patch.object(db, "QUESTION_BANK", bank):
-            with preparator.app.app_context():
-                db.init_db()
+        with (
+            mock.patch.object(db, "QUESTION_BANK", bank),
+            preparator.app.app_context(),
+        ):
+            db.init_db()
         return bank, old, ids
 
     def test_edited_prompts_retire_old_rows(self):
@@ -1188,9 +1202,11 @@ class PreparatorTests(unittest.TestCase):
     def test_topics_and_matrix_omit_groups_with_only_retired_questions(self):
         gone = QUESTION_BANK[0]["topic"]
         bank = [q for q in QUESTION_BANK if q["topic"] != gone]
-        with mock.patch.object(db, "QUESTION_BANK", bank):
-            with preparator.app.app_context():
-                db.init_db()
+        with (
+            mock.patch.object(db, "QUESTION_BANK", bank),
+            preparator.app.app_context(),
+        ):
+            db.init_db()
         dashboard = self.client.get("/api/dashboard").get_json()
         self.assertNotIn(gone, [t["topic"] for t in dashboard["topics"]])
         self.assertNotIn(gone, [m["topic"] for m in dashboard["matrix"]])
@@ -1217,10 +1233,12 @@ class PreparatorTests(unittest.TestCase):
             database = db.get_db()
             total = database.execute("SELECT COUNT(*) FROM questions").fetchone()[0]
         bank = [{"topic": "Python"}] + [dict(q) for q in QUESTION_BANK]
-        with mock.patch.object(db, "QUESTION_BANK", bank):
-            with preparator.app.app_context():
-                with self.assertRaises(KeyError):
-                    db.init_db()
+        with (
+            mock.patch.object(db, "QUESTION_BANK", bank),
+            preparator.app.app_context(),
+            self.assertRaises(KeyError),
+        ):
+            db.init_db()
         with preparator.app.app_context():
             database = db.get_db()
             self.assertEqual(database.execute(
@@ -1626,9 +1644,11 @@ class PreparatorTests(unittest.TestCase):
 
     def test_unhandled_exception_is_json_500_without_traceback(self):
         qid = self._theory_id()
-        with mock.patch.object(preparator, "evaluate_answer", side_effect=RuntimeError("secret-detail")):
-            with self.assertLogs(preparator.app.logger, level="ERROR"):
-                response = self.client.post("/api/answer", json={"question_id": qid, "answer": "x"})
+        with (
+            mock.patch.object(preparator, "evaluate_answer", side_effect=RuntimeError("secret-detail")),
+            self.assertLogs(preparator.app.logger, level="ERROR"),
+        ):
+            response = self.client.post("/api/answer", json={"question_id": qid, "answer": "x"})
         self._assert_error(response, 500, "Something went wrong. Try again.")
         text = response.get_data(as_text=True)
         self.assertNotIn("Traceback", text)
@@ -1641,10 +1661,12 @@ class PreparatorTests(unittest.TestCase):
 
     def test_non_api_500_stays_html_and_is_logged_once(self):
         # TESTING would re-raise; switch propagation off to see the served response.
-        with mock.patch.dict(preparator.app.config, {"PROPAGATE_EXCEPTIONS": False, "TESTING": False}):
-            with mock.patch.object(preparator, "render_template", side_effect=RuntimeError("boom")):
-                with self.assertLogs(preparator.app.logger, level="ERROR") as logs:
-                    response = self.client.get("/")
+        with (
+            mock.patch.dict(preparator.app.config, {"PROPAGATE_EXCEPTIONS": False, "TESTING": False}),
+            mock.patch.object(preparator, "render_template", side_effect=RuntimeError("boom")),
+            self.assertLogs(preparator.app.logger, level="ERROR") as logs,
+        ):
+            response = self.client.get("/")
         self.assertEqual(response.status_code, 500)
         self.assertFalse(response.is_json)
         self.assertEqual(len(logs.records), 1)
@@ -1816,7 +1838,7 @@ class PreparatorTests(unittest.TestCase):
                 "assert not calls, calls\n"
             )
             result = subprocess.run(
-                [sys.executable, "-c", code], cwd=work, env=env, capture_output=True, text=True
+                [sys.executable, "-c", code], cwd=work, env=env, capture_output=True, text=True, check=False
             )
             self.assertEqual(result.returncode, 0, result.stderr)
 
