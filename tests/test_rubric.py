@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 import app as preparator
+import db
 from question_bank import QUESTION_BANK
 
 
@@ -117,7 +118,7 @@ class AnswerEndpointTests(unittest.TestCase):
         self.database.close()
         preparator.app.config.update(TESTING=True, DATABASE=self.database.name)
         with preparator.app.app_context():
-            preparator.init_db()
+            db.init_db()
         self.client = preparator.app.test_client()
 
     def tearDown(self):
@@ -125,7 +126,7 @@ class AnswerEndpointTests(unittest.TestCase):
 
     def test_response_has_attempt_id_and_concepts(self):
         with preparator.app.app_context():
-            row = preparator.get_db().execute(
+            row = db.get_db().execute(
                 "SELECT id, criteria FROM questions WHERE mode = 'Theory' AND retired = 0 LIMIT 1"
             ).fetchone()
         response = self.client.post(
@@ -134,7 +135,7 @@ class AnswerEndpointTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.get_json()
         with preparator.app.app_context():
-            stored = preparator.get_db().execute(
+            stored = db.get_db().execute(
                 "SELECT MAX(id) FROM attempts WHERE question_id = ?", (row["id"],)
             ).fetchone()[0]
         self.assertEqual(body["attempt_id"], stored)

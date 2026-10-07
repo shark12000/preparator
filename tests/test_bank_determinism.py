@@ -20,8 +20,9 @@ print(hashlib.sha256(repr(identities).encode("utf-8")).hexdigest())
 SEED_SCRIPT = """
 import sqlite3
 import app as preparator
+import db
 with preparator.app.app_context():
-    preparator.init_db()
+    db.init_db()
 connection = sqlite3.connect(preparator.app.config["DATABASE"])
 total = connection.execute("SELECT COUNT(*) FROM questions").fetchone()[0]
 active = connection.execute("SELECT COUNT(*) FROM questions WHERE retired = 0").fetchone()[0]

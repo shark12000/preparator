@@ -12,6 +12,8 @@ import unittest
 from datetime import date, datetime, time, timedelta, timezone
 from unittest import mock
 import app as preparator
+import db
+from question_bank import QUESTION_BANK
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bank_identities  # noqa: E402
@@ -23,7 +25,7 @@ class PreparatorTests(unittest.TestCase):
         self.database.close()
         preparator.app.config.update(TESTING=True, DATABASE=self.database.name)
         with preparator.app.app_context():
-            preparator.init_db()
+            db.init_db()
         self.client = preparator.app.test_client()
 
     def tearDown(self):
@@ -88,7 +90,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_submitting_unchanged_starter_is_rejected(self):
         with preparator.app.app_context():
-            row = preparator.get_db().execute(
+            row = db.get_db().execute(
                 "SELECT id, starter_code FROM questions WHERE starter_code != '' LIMIT 1"
             ).fetchone()
         response = self.client.post(
@@ -99,10 +101,10 @@ class PreparatorTests(unittest.TestCase):
 
     def test_seeding_refreshes_edited_question_content(self):
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             database.execute("UPDATE questions SET explanation = 'stale'")
             database.commit()
-            preparator.init_db()
+            db.init_db()
             stale = database.execute(
                 "SELECT COUNT(*) FROM questions WHERE explanation = 'stale'"
             ).fetchone()[0]
@@ -117,7 +119,7 @@ class PreparatorTests(unittest.TestCase):
 
     def _insert_attempts_on_days_ago(self, offsets, at=None):
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             qid = database.execute("SELECT id FROM questions WHERE retired = 0 LIMIT 1").fetchone()[0]
             for offset in offsets:
                 local_noon = datetime.combine(date.today() - timedelta(days=offset), at or time(12)).astimezone()
@@ -153,7 +155,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_dashboard_reports_trend_matrix_and_streak(self):
         with preparator.app.app_context():
-            question_id = preparator.get_db().execute("SELECT id FROM questions LIMIT 1").fetchone()[0]
+            question_id = db.get_db().execute("SELECT id FROM questions LIMIT 1").fetchone()[0]
         self.client.post("/api/answer", json={"question_id": question_id, "answer": "mutable"})
         dashboard = self.client.get("/api/dashboard").get_json()
         self.assertEqual(len(dashboard["trend"]), 1)
@@ -164,7 +166,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_specific_question_can_be_requested(self):
         with preparator.app.app_context():
-            question_id = preparator.get_db().execute(
+            question_id = db.get_db().execute(
                 "SELECT id FROM questions WHERE mode = 'Coding' LIMIT 1"
             ).fetchone()[0]
         response = self.client.post(
@@ -186,7 +188,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/question", json={}).status_code, 200)
 
     def test_question_bank_covers_every_level_and_filters_correctly(self):
-        levels = {question["difficulty"] for question in preparator.QUESTION_BANK}
+        levels = {question["difficulty"] for question in QUESTION_BANK}
         self.assertEqual(levels, {"Foundations", "Intermediate", "Advanced"})
         for level in levels:
             response = self.client.post(
@@ -202,11 +204,11 @@ class PreparatorTests(unittest.TestCase):
             self.assertEqual(response.get_json()["question"]["difficulty"], level)
 
     def test_bank_has_over_300_unique_prompts_across_all_levels(self):
-        prompts = [question["prompt"] for question in preparator.QUESTION_BANK]
+        prompts = [question["prompt"] for question in QUESTION_BANK]
         self.assertGreaterEqual(len(prompts), 300)
         self.assertEqual(len(prompts), len(set(prompts)))
         counts = {
-            level: sum(question["difficulty"] == level for question in preparator.QUESTION_BANK)
+            level: sum(question["difficulty"] == level for question in QUESTION_BANK)
             for level in ("Foundations", "Intermediate", "Advanced")
         }
         self.assertTrue(all(count >= 100 for count in counts.values()), counts)
@@ -214,7 +216,7 @@ class PreparatorTests(unittest.TestCase):
     def test_coding_question_includes_a_python_starter(self):
         # Deterministic: check every Foundations Coding question the endpoint could serve.
         with preparator.app.app_context():
-            rows = preparator.get_db().execute(
+            rows = db.get_db().execute(
                 "SELECT * FROM questions WHERE difficulty = 'Foundations' AND mode = 'Coding' AND retired = 0"
             ).fetchall()
             served = [preparator.question_dict(row) for row in rows]
@@ -242,7 +244,7 @@ class PreparatorTests(unittest.TestCase):
         Optionally replaces its criteria. Targets the exact row it blanked.
         """
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             question_id = database.execute(
                 "SELECT id FROM questions WHERE mode = 'Coding' AND retired = 0 LIMIT 1"
             ).fetchone()["id"]
@@ -274,7 +276,7 @@ class PreparatorTests(unittest.TestCase):
                     "Replace the starter stub with your solution before submitting.",
                 )
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             self.assertEqual(database.execute("SELECT COUNT(*) FROM attempts").fetchone()[0], 0)
             self.assertEqual(database.execute("SELECT COUNT(*) FROM weaknesses").fetchone()[0], 0)
 
@@ -313,7 +315,7 @@ class PreparatorTests(unittest.TestCase):
         )
 
     def test_every_coding_item_has_starter_code(self):
-        coding = [question for question in preparator.QUESTION_BANK if question["mode"] == "Coding"]
+        coding = [question for question in QUESTION_BANK if question["mode"] == "Coding"]
         self.assertGreater(len(coding), 0)
         for question in coding:
             with self.subTest(prompt=question["prompt"]):
@@ -349,7 +351,7 @@ class PreparatorTests(unittest.TestCase):
                         self.assertIsInstance(member.body[0], ast.Pass)
             return names
 
-        for question in preparator.QUESTION_BANK:
+        for question in QUESTION_BANK:
             if question["mode"] != "Coding":
                 continue
             with self.subTest(prompt=question["prompt"]):
@@ -359,7 +361,7 @@ class PreparatorTests(unittest.TestCase):
                 )
 
     def test_theory_model_answers_meet_their_own_rubric(self):
-        theory = [question for question in preparator.QUESTION_BANK if question["mode"] == "Theory"]
+        theory = [question for question in QUESTION_BANK if question["mode"] == "Theory"]
         self.assertGreater(len(theory), 0)
         for question in theory:
             with self.subTest(prompt=question["prompt"]):
@@ -382,7 +384,7 @@ class PreparatorTests(unittest.TestCase):
             )
 
     def test_coding_model_answers_meet_their_own_rubric(self):
-        coding = [question for question in preparator.QUESTION_BANK if question["mode"] == "Coding"]
+        coding = [question for question in QUESTION_BANK if question["mode"] == "Coding"]
         self.assertGreater(len(coding), 0)
         for question in coding:
             with self.subTest(prompt=question["prompt"]):
@@ -393,7 +395,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_dashboard_reports_canonical_bank_count(self):
         response = self.client.get("/api/dashboard")
-        self.assertEqual(response.get_json()["question_count"], len(preparator.QUESTION_BANK))
+        self.assertEqual(response.get_json()["question_count"], len(QUESTION_BANK))
 
     def test_question_response_has_only_the_question_key(self):
         response = self.client.post("/api/question", json={"topic": "Python Core"})
@@ -424,7 +426,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_low_score_adds_question_to_weakness_queue(self):
         with preparator.app.app_context():
-            question_id = preparator.get_db().execute("SELECT id FROM questions LIMIT 1").fetchone()[0]
+            question_id = db.get_db().execute("SELECT id FROM questions LIMIT 1").fetchone()[0]
         response = self.client.post("/api/answer", json={"question_id": question_id, "answer": "Not sure."})
         self.assertEqual(response.status_code, 200)
         dashboard = self.client.get("/api/dashboard").get_json()
@@ -442,7 +444,7 @@ class PreparatorTests(unittest.TestCase):
 
     def _first_question_id(self):
         with preparator.app.app_context():
-            return preparator.get_db().execute(
+            return db.get_db().execute(
                 "SELECT id FROM questions WHERE retired = 0 LIMIT 1"
             ).fetchone()[0]
 
@@ -478,7 +480,7 @@ class PreparatorTests(unittest.TestCase):
         qid = self._first_question_id()
         self.client.post(f"/api/weakness/{qid}", json={})
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             database.execute(
                 "UPDATE weaknesses SET updated_at = '2000-01-01T00:00:00+00:00' WHERE question_id = ?",
                 (qid,),
@@ -486,14 +488,14 @@ class PreparatorTests(unittest.TestCase):
             database.commit()
         self._answer_with_score(qid, 10)
         with preparator.app.app_context():
-            updated = preparator.get_db().execute(
+            updated = db.get_db().execute(
                 "SELECT updated_at FROM weaknesses WHERE question_id = ?", (qid,)
             ).fetchone()[0]
         self.assertGreater(updated, "2000-01-01T00:00:00+00:00")
 
     def test_theory_lesson_and_note_are_saved_and_exported(self):
         lessons = self.client.get("/api/theory").get_json()["lessons"]
-        expected_lessons = sum(question["mode"] == "Theory" for question in preparator.QUESTION_BANK)
+        expected_lessons = sum(question["mode"] == "Theory" for question in QUESTION_BANK)
         self.assertEqual(len(lessons), expected_lessons)
         lesson = lessons[0]
         self.assertEqual(lesson["note"], "")
@@ -515,15 +517,15 @@ class PreparatorTests(unittest.TestCase):
 
     def test_database_seeding_is_idempotent(self):
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             before = database.execute("SELECT COUNT(*) FROM questions").fetchone()[0]
-            preparator.init_db()
+            db.init_db()
             after = database.execute("SELECT COUNT(*) FROM questions").fetchone()[0]
         self.assertEqual(after, before)
 
     def test_theory_export_neutralizes_spreadsheet_formulas(self):
         with preparator.app.app_context():
-            question_id = preparator.get_db().execute(
+            question_id = db.get_db().execute(
                 "SELECT id FROM questions WHERE mode = 'Theory' LIMIT 1"
             ).fetchone()[0]
         self.client.post(
@@ -535,7 +537,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_theory_save_rejects_non_theory_questions(self):
         with preparator.app.app_context():
-            question_id = preparator.get_db().execute(
+            question_id = db.get_db().execute(
                 "SELECT id FROM questions WHERE mode = 'Coding' LIMIT 1"
             ).fetchone()[0]
         response = self.client.post(f"/api/theory/{question_id}", json={"note": "not a theory lesson"})
@@ -543,7 +545,7 @@ class PreparatorTests(unittest.TestCase):
 
     def _theory_id(self):
         with preparator.app.app_context():
-            return preparator.get_db().execute(
+            return db.get_db().execute(
                 "SELECT id FROM questions WHERE mode = 'Theory' LIMIT 1"
             ).fetchone()[0]
 
@@ -563,7 +565,7 @@ class PreparatorTests(unittest.TestCase):
         response = self.client.post(f"/api/weakness/{qid}", data={"a": "b"})
         self.assertEqual(response.status_code, 415)
         with preparator.app.app_context():
-            count = preparator.get_db().execute("SELECT COUNT(*) FROM weaknesses").fetchone()[0]
+            count = db.get_db().execute("SELECT COUNT(*) FROM weaknesses").fetchone()[0]
         self.assertEqual(count, 0)
 
     def test_foreign_host_is_rejected_everywhere(self):
@@ -615,7 +617,7 @@ class PreparatorTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         path = os.path.join(directory.name, "fresh.sqlite3")
-        self.addCleanup(preparator._initialized_databases.discard, path)
+        self.addCleanup(db._initialized_databases.discard, path)
         return path
 
     def test_concurrent_first_requests_on_fresh_database_succeed(self):
@@ -625,7 +627,7 @@ class PreparatorTests(unittest.TestCase):
         for _ in range(5):
             path = self._fresh_database_path()
             preparator.app.config["DATABASE"] = path
-            self.assertNotIn(path, preparator._initialized_databases)
+            self.assertNotIn(path, db._initialized_databases)
             barrier = threading.Barrier(len(urls))
             results = [None] * len(urls)
 
@@ -645,15 +647,15 @@ class PreparatorTests(unittest.TestCase):
                 self.assertIsNotNone(result)
                 self.assertEqual(result[1], 200, result)
                 if result[0] == "/api/dashboard":
-                    self.assertEqual(result[2]["question_count"], len(preparator.QUESTION_BANK))
-            self.assertIn(path, preparator._initialized_databases)
+                    self.assertEqual(result[2]["question_count"], len(QUESTION_BANK))
+            self.assertIn(path, db._initialized_databases)
 
     def test_failed_init_is_retried_on_next_request(self):
         original = preparator.app.config["DATABASE"]
         self.addCleanup(preparator.app.config.__setitem__, "DATABASE", original)
         path = self._fresh_database_path()
         preparator.app.config["DATABASE"] = path
-        real_init = preparator.init_db
+        real_init = db.init_db
         calls = []
 
         def flaky_init():
@@ -664,11 +666,11 @@ class PreparatorTests(unittest.TestCase):
 
         client = preparator.app.test_client()
         with mock.patch.dict(preparator.app.config, {"PROPAGATE_EXCEPTIONS": False}), \
-                mock.patch.object(preparator, "init_db", flaky_init):
+                mock.patch.object(db, "init_db", flaky_init):
             self.assertEqual(client.get("/api/dashboard").status_code, 500)
-            self.assertNotIn(path, preparator._initialized_databases)
+            self.assertNotIn(path, db._initialized_databases)
             self.assertEqual(client.get("/api/dashboard").status_code, 200)
-        self.assertIn(path, preparator._initialized_databases)
+        self.assertIn(path, db._initialized_databases)
         self.assertEqual(len(calls), 2)
         connection = sqlite3.connect(path)
         try:
@@ -707,13 +709,13 @@ class PreparatorTests(unittest.TestCase):
         self.addCleanup(preparator.app.config.__setitem__, "DATABASE", original)
         preparator.app.config["DATABASE"] = path
         with preparator.app.app_context():
-            preparator.init_db()
+            db.init_db()
 
     def test_fresh_database_ends_at_latest_version_with_baseline_schema(self):
         path = self._fresh_database_path()
         self._run_init(path)
         objects, columns, version = self._schema_snapshot(path)
-        self.assertEqual(version, preparator.MIGRATIONS[-1][0])
+        self.assertEqual(version, db.MIGRATIONS[-1][0])
         names = {name for _, name in objects}
         self.assertTrue({"questions", "attempts", "weaknesses", "saved_lessons",
                          "attempts_question_id", "questions_identity"} <= names)
@@ -742,7 +744,7 @@ class PreparatorTests(unittest.TestCase):
         connection.close()
         self._run_init(path)
         _, columns, version = self._schema_snapshot(path)
-        self.assertEqual(version, preparator.MIGRATIONS[-1][0])
+        self.assertEqual(version, db.MIGRATIONS[-1][0])
         self.assertIn("starter_code", columns)
         self.assertIn("retired", columns)
         self.assertIn("saved", self._table_columns(path, "saved_lessons"))
@@ -786,8 +788,8 @@ class PreparatorTests(unittest.TestCase):
             database.execute("ALTER TABLE questions ADD COLUMN extra TEXT NOT NULL DEFAULT ''")
             raise RuntimeError("boom")
 
-        migrations = preparator.MIGRATIONS + [(len(preparator.MIGRATIONS) + 1, step_3)]
-        with mock.patch.object(preparator, "MIGRATIONS", migrations):
+        migrations = db.MIGRATIONS + [(len(db.MIGRATIONS) + 1, step_3)]
+        with mock.patch.object(db, "MIGRATIONS", migrations):
             with self.assertRaises(RuntimeError):
                 self._run_init(path)
         self.assertEqual(self._schema_snapshot(path), before)
@@ -804,14 +806,14 @@ class PreparatorTests(unittest.TestCase):
             database.execute("CREATE TABLE attempts (id INTEGER)")
             raise RuntimeError("boom")
 
-        with mock.patch.object(preparator, "MIGRATIONS", [(1, broken)]):
+        with mock.patch.object(db, "MIGRATIONS", [(1, broken)]):
             with self.assertRaises(RuntimeError):
                 self._run_init(path)
         self.assertEqual(self._schema_snapshot(path), before)
         self.assertEqual(before[2], 0)
 
     def test_migration_versions_are_consecutive_from_one(self):
-        versions = [version for version, _ in preparator.MIGRATIONS]
+        versions = [version for version, _ in db.MIGRATIONS]
         self.assertEqual(versions, list(range(1, len(versions) + 1)))
 
     def test_failing_later_step_rolls_back_earlier_version_write_on_fresh_database(self):
@@ -820,8 +822,8 @@ class PreparatorTests(unittest.TestCase):
         def boom(database):
             raise RuntimeError("boom")
 
-        migrations = preparator.MIGRATIONS + [(len(preparator.MIGRATIONS) + 1, boom)]
-        with mock.patch.object(preparator, "MIGRATIONS", migrations):
+        migrations = db.MIGRATIONS + [(len(db.MIGRATIONS) + 1, boom)]
+        with mock.patch.object(db, "MIGRATIONS", migrations):
             with self.assertRaises(RuntimeError):
                 self._run_init(path)
         connection = sqlite3.connect(path)
@@ -852,11 +854,11 @@ class PreparatorTests(unittest.TestCase):
         self.addCleanup(preparator.app.config.__setitem__, "DATABASE", original)
         preparator.app.config["DATABASE"] = path
         with preparator.app.app_context():
-            real = preparator.get_db()
-            with mock.patch.object(preparator, "run_migrations", boom), \
-                    mock.patch.object(preparator, "get_db", lambda: FailingRollback(real)):
+            real = db.get_db()
+            with mock.patch.object(db, "run_migrations", boom), \
+                    mock.patch.object(db, "get_db", lambda: FailingRollback(real)):
                 with self.assertRaises(RuntimeError) as caught:
-                    preparator.init_db()
+                    db.init_db()
         self.assertEqual(str(caught.exception), "original")
 
     def _newer_database(self):
@@ -865,10 +867,10 @@ class PreparatorTests(unittest.TestCase):
         self._run_init(path)
         connection = sqlite3.connect(path)
         connection.execute("UPDATE questions SET explanation = 'edited' WHERE id = 1")
-        connection.execute(f"PRAGMA user_version = {preparator.MIGRATIONS[-1][0] + 1}")
+        connection.execute(f"PRAGMA user_version = {db.MIGRATIONS[-1][0] + 1}")
         connection.commit()
         connection.close()
-        preparator._initialized_databases.discard(path)
+        db._initialized_databases.discard(path)
         return path
 
     def _db_state(self, path):
@@ -883,7 +885,7 @@ class PreparatorTests(unittest.TestCase):
             connection.close()
 
     def _newer_message(self):
-        latest = preparator.MIGRATIONS[-1][0]
+        latest = db.MIGRATIONS[-1][0]
         return (f"This database (schema version {latest + 1}) was created by a newer version "
                 f"of Preparator; this version supports up to {latest}. Update Preparator, "
                 "or set PREPARATOR_DATABASE to a different file.")
@@ -891,7 +893,7 @@ class PreparatorTests(unittest.TestCase):
     def test_newer_database_version_is_refused_without_writes(self):
         path = self._newer_database()
         before = self._db_state(path)
-        with self.assertRaises(preparator.SchemaTooNewError) as caught:
+        with self.assertRaises(db.SchemaTooNewError) as caught:
             self._run_init(path)
         self.assertEqual(str(caught.exception), self._newer_message())
         self.assertEqual(self._db_state(path), before)
@@ -909,13 +911,13 @@ class PreparatorTests(unittest.TestCase):
             self.assertIn(self._newer_message(), " ".join(logs.output))
             self.assertEqual(response.status_code, 500)
             self.assertEqual(response.get_json(), {"error": "Something went wrong. Try again."})
-            self.assertNotIn(path, preparator._initialized_databases)
+            self.assertNotIn(path, db._initialized_databases)
             connection = sqlite3.connect(path)
-            connection.execute(f"PRAGMA user_version = {preparator.MIGRATIONS[-1][0]}")
+            connection.execute(f"PRAGMA user_version = {db.MIGRATIONS[-1][0]}")
             connection.commit()
             connection.close()
             self.assertEqual(client.get("/api/dashboard").status_code, 200)
-        self.assertIn(path, preparator._initialized_databases)
+        self.assertIn(path, db._initialized_databases)
 
     def test_prepare_database_lets_other_exceptions_propagate(self):
         original = preparator.app.config["DATABASE"]
@@ -923,7 +925,7 @@ class PreparatorTests(unittest.TestCase):
         preparator.app.config["DATABASE"] = self._fresh_database_path()
         stderr = io.StringIO()
         with (
-            mock.patch.object(preparator, "init_db", side_effect=RuntimeError("boom")),
+            mock.patch.object(db, "init_db", side_effect=RuntimeError("boom")),
             contextlib.redirect_stderr(stderr),
             self.assertRaises(RuntimeError) as caught,
         ):
@@ -941,8 +943,8 @@ class PreparatorTests(unittest.TestCase):
             connection.set_trace_callback(statements.append)
             return connection
 
-        with mock.patch.object(preparator.sqlite3, "connect", traced_connect):
-            with self.assertRaises(preparator.SchemaTooNewError):
+        with mock.patch.object(db.sqlite3, "connect", traced_connect):
+            with self.assertRaises(db.SchemaTooNewError):
                 self._run_init(path)
         self.assertIn("PRAGMA user_version", statements)
         writes = ("INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "REPLACE")
@@ -989,7 +991,7 @@ class PreparatorTests(unittest.TestCase):
         connection.commit()
         connection.close()
         self._run_init(path)  # points the app at `path` for the rest of the test
-        self.assertEqual(self._schema_snapshot(path)[2], preparator.MIGRATIONS[-1][0])
+        self.assertEqual(self._schema_snapshot(path)[2], db.MIGRATIONS[-1][0])
         lesson, saved_count = self._lesson(qid)
         self.assertTrue(lesson["saved"])
         self.assertEqual(lesson["note"], "old note")
@@ -1007,12 +1009,12 @@ class PreparatorTests(unittest.TestCase):
 
     def _saved_at(self, qid):
         with preparator.app.app_context():
-            return preparator.get_db().execute(
+            return db.get_db().execute(
                 "SELECT saved_at FROM saved_lessons WHERE question_id = ?", (qid,)).fetchone()[0]
 
     def _set_saved_at(self, qid, value):
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             database.execute("UPDATE saved_lessons SET saved_at = ? WHERE question_id = ?", (value, qid))
             database.commit()
 
@@ -1053,7 +1055,7 @@ class PreparatorTests(unittest.TestCase):
         self.client.post(f"/api/theory/{qid}", json={"note": ""})
         self.assertEqual(self.client.delete(f"/api/theory/{qid}").get_json(), {"saved": False})
         with preparator.app.app_context():
-            count = preparator.get_db().execute(
+            count = db.get_db().execute(
                 "SELECT COUNT(*) FROM saved_lessons WHERE question_id = ?", (qid,)).fetchone()[0]
         self.assertEqual(count, 0)
         lesson, _ = self._lesson(qid)
@@ -1061,7 +1063,7 @@ class PreparatorTests(unittest.TestCase):
 
     def _saved_row_count(self, qid):
         with preparator.app.app_context():
-            return preparator.get_db().execute(
+            return db.get_db().execute(
                 "SELECT COUNT(*) FROM saved_lessons WHERE question_id = ?", (qid,)).fetchone()[0]
 
     def test_unsaving_a_whitespace_only_note_removes_the_row(self):
@@ -1093,7 +1095,7 @@ class PreparatorTests(unittest.TestCase):
     }
 
     def _edited_bank(self):
-        bank = [dict(item) for item in preparator.QUESTION_BANK]
+        bank = [dict(item) for item in QUESTION_BANK]
         old = {}
         for mode in ("Theory", "Coding"):
             item = next(q for q in bank if q["mode"] == mode)
@@ -1103,16 +1105,16 @@ class PreparatorTests(unittest.TestCase):
 
     def _ids(self, prompts):
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             return {p: database.execute(
                 "SELECT id FROM questions WHERE prompt = ?", (p,)).fetchone()[0] for p in prompts}
 
     def _retire_edited(self):
         bank, old = self._edited_bank()
         ids = self._ids(old.values())
-        with mock.patch.object(preparator, "QUESTION_BANK", bank):
+        with mock.patch.object(db, "QUESTION_BANK", bank):
             with preparator.app.app_context():
-                preparator.init_db()
+                db.init_db()
         return bank, old, ids
 
     def test_edited_prompts_retire_old_rows(self):
@@ -1124,7 +1126,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertIn(old["Theory"] + " (edited)", titles)
         self.assertNotIn(old["Theory"], titles)
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             retired = {r[0] for r in database.execute("SELECT id FROM questions WHERE retired = 1")}
             self.assertEqual(retired, set(ids.values()))
             # Give every active row one attempt so least-practiced ordering would
@@ -1180,15 +1182,15 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(after["weak_count"], 0)
         self.assertEqual(after["weak_questions"], [])
         with preparator.app.app_context():
-            self.assertEqual(preparator.get_db().execute(
+            self.assertEqual(db.get_db().execute(
                 "SELECT COUNT(*) FROM weaknesses").fetchone()[0], 1)
 
     def test_topics_and_matrix_omit_groups_with_only_retired_questions(self):
-        gone = preparator.QUESTION_BANK[0]["topic"]
-        bank = [q for q in preparator.QUESTION_BANK if q["topic"] != gone]
-        with mock.patch.object(preparator, "QUESTION_BANK", bank):
+        gone = QUESTION_BANK[0]["topic"]
+        bank = [q for q in QUESTION_BANK if q["topic"] != gone]
+        with mock.patch.object(db, "QUESTION_BANK", bank):
             with preparator.app.app_context():
-                preparator.init_db()
+                db.init_db()
         dashboard = self.client.get("/api/dashboard").get_json()
         self.assertNotIn(gone, [t["topic"] for t in dashboard["topics"]])
         self.assertNotIn(gone, [m["topic"] for m in dashboard["matrix"]])
@@ -1205,22 +1207,22 @@ class PreparatorTests(unittest.TestCase):
     def test_reseeding_reactivates_a_retired_identity(self):
         _, old, ids = self._retire_edited()
         with preparator.app.app_context():
-            preparator.init_db()  # original bank again
-            row = preparator.get_db().execute(
+            db.init_db()  # original bank again
+            row = db.get_db().execute(
                 "SELECT retired FROM questions WHERE id = ?", (ids[old["Theory"]],)).fetchone()
         self.assertEqual(row[0], 0)
 
     def test_failed_seed_leaves_no_rows_retired(self):
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             total = database.execute("SELECT COUNT(*) FROM questions").fetchone()[0]
-        bank = [{"topic": "Python"}] + [dict(q) for q in preparator.QUESTION_BANK]
-        with mock.patch.object(preparator, "QUESTION_BANK", bank):
+        bank = [{"topic": "Python"}] + [dict(q) for q in QUESTION_BANK]
+        with mock.patch.object(db, "QUESTION_BANK", bank):
             with preparator.app.app_context():
                 with self.assertRaises(KeyError):
-                    preparator.init_db()
+                    db.init_db()
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             self.assertEqual(database.execute(
                 "SELECT COALESCE(SUM(retired), 0), COUNT(*) FROM questions").fetchone()[:], (0, total))
 
@@ -1250,7 +1252,7 @@ class PreparatorTests(unittest.TestCase):
         connection.commit()
         connection.close()
         self._run_init(path)
-        self.assertEqual(self._schema_snapshot(path)[2], preparator.MIGRATIONS[-1][0])
+        self.assertEqual(self._schema_snapshot(path)[2], db.MIGRATIONS[-1][0])
         self.assertIn("questions_identity", {n for _, n in self._schema_snapshot(path)[0]})
         connection = sqlite3.connect(path)
         try:
@@ -1272,7 +1274,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(dashboard["attempts"], 1)
         self.assertEqual(dashboard["weak_count"], 0)
         identities = {(q["topic"], q["difficulty"], q["mode"], q["prompt"])
-                      for q in preparator.QUESTION_BANK}
+                      for q in QUESTION_BANK}
         self.assertEqual(dashboard["question_count"], len(identities))
         titles = [x["title"] for x in self.client.get("/api/theory").get_json()["lessons"]]
         self.assertNotIn("Stale prompt", titles)
@@ -1299,8 +1301,8 @@ class PreparatorTests(unittest.TestCase):
                   for t in ("attempts", "weaknesses", "questions", "saved_lessons")}
         connection.close()
         self._run_init(path)
-        self.assertEqual(self._schema_snapshot(path)[2], preparator.MIGRATIONS[-1][0])
-        self.assertGreaterEqual(preparator.MIGRATIONS[-1][0], 4)
+        self.assertEqual(self._schema_snapshot(path)[2], db.MIGRATIONS[-1][0])
+        self.assertGreaterEqual(db.MIGRATIONS[-1][0], 4)
         connection = sqlite3.connect(path)
         try:
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM rubric_overrides").fetchone()[0], 0)
@@ -1316,7 +1318,7 @@ class PreparatorTests(unittest.TestCase):
     def _attempt_for(self, answer, prompt=None):
         prompt = prompt or self.DICT_PROMPT
         with preparator.app.app_context():
-            qid = preparator.get_db().execute(
+            qid = db.get_db().execute(
                 "SELECT id FROM questions WHERE prompt = ?", (prompt,)).fetchone()[0]
         response = self.client.post("/api/answer", json={"question_id": qid, "answer": answer})
         self.assertEqual(response.status_code, 200)
@@ -1324,7 +1326,7 @@ class PreparatorTests(unittest.TestCase):
 
     def _override_rows(self):
         with preparator.app.app_context():
-            return [tuple(r) for r in preparator.get_db().execute(
+            return [tuple(r) for r in db.get_db().execute(
                 "SELECT attempt_id, question_id, criterion_index, criterion_label "
                 "FROM rubric_overrides ORDER BY id")]
 
@@ -1346,12 +1348,12 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0], (attempt_id, qid, 0, result["concepts"][0]["label"]))
         with preparator.app.app_context():
-            first = [tuple(r) for r in preparator.get_db().execute(
+            first = [tuple(r) for r in db.get_db().execute(
                 "SELECT id, created_at FROM rubric_overrides ORDER BY id")]
         self.assertEqual(len(first), 2)
         self.assertEqual(self.client.post(url, json={"criterion_index": 0}).status_code, 200)
         with preparator.app.app_context():
-            again = [tuple(r) for r in preparator.get_db().execute(
+            again = [tuple(r) for r in db.get_db().execute(
                 "SELECT id, created_at FROM rubric_overrides ORDER BY id")]
         self.assertEqual(again, first)
 
@@ -1359,7 +1361,7 @@ class PreparatorTests(unittest.TestCase):
         # The stored answer keeps the starter lines. A keyword that appears only in the
         # starter must not count as detected, so the override is allowed (200, not 409).
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             found = None
             for row in database.execute(
                     "SELECT * FROM questions WHERE retired = 0 AND mode = 'Coding' ORDER BY id"):
@@ -1442,7 +1444,7 @@ class PreparatorTests(unittest.TestCase):
 
         def snapshot():
             with preparator.app.app_context():
-                database = preparator.get_db()
+                database = db.get_db()
                 return (
                     [tuple(r) for r in database.execute("SELECT * FROM attempts ORDER BY id")],
                     [tuple(r) for r in database.execute("SELECT * FROM weaknesses ORDER BY question_id")],
@@ -1462,7 +1464,7 @@ class PreparatorTests(unittest.TestCase):
     def test_override_accepted_on_retired_question(self):
         qid, result = self._attempt_for("It fails with brackets.")
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             database.execute("UPDATE questions SET retired = 1 WHERE id = ?", (qid,))
             database.commit()
         response = self.client.post(
@@ -1475,7 +1477,7 @@ class PreparatorTests(unittest.TestCase):
         url = f"/api/attempts/{result['attempt_id']}/overrides"
         self.assertEqual(self.client.post(url, json={"criterion_index": 2}).status_code, 200)
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             criteria = json.loads(database.execute(
                 "SELECT criteria FROM questions WHERE id = ?", (qid,)).fetchone()[0])
             criteria[2]["keywords"].append("brackets")
@@ -1553,7 +1555,7 @@ class PreparatorTests(unittest.TestCase):
             connection.set_trace_callback(statements.append)
             return connection
 
-        with mock.patch.object(preparator.sqlite3, "connect", tracing_connect):
+        with mock.patch.object(db.sqlite3, "connect", tracing_connect):
             self._answer_with_score(qid, 5)
         insert = next(i for i, s in enumerate(statements) if "INSERT INTO attempts" in s)
         select = next(i for i, s in enumerate(statements)
@@ -1562,7 +1564,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_previous_score_is_per_question_id(self):
         with preparator.app.app_context():
-            a, b = [r[0] for r in preparator.get_db().execute(
+            a, b = [r[0] for r in db.get_db().execute(
                 "SELECT id FROM questions WHERE retired = 0 LIMIT 2")]
         self.assertIsNone(self._answer_with_score(a, 2)["previous_score"])
         self.assertIsNone(self._answer_with_score(b, 8)["previous_score"])
@@ -1572,7 +1574,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_rejected_requests_do_not_change_previous_score(self):
         with preparator.app.app_context():
-            row = preparator.get_db().execute(
+            row = db.get_db().execute(
                 "SELECT id, starter_code FROM questions WHERE mode = 'Coding' AND retired = 0 "
                 "AND starter_code != '' LIMIT 1").fetchone()
         qid = row["id"]
@@ -1591,7 +1593,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertIsNone(self._answer_with_score(retired_id, 3)["previous_score"])
         self.assertEqual(self._answer_with_score(retired_id, 6)["previous_score"], 3)
         with preparator.app.app_context():
-            successor = preparator.get_db().execute(
+            successor = db.get_db().execute(
                 "SELECT id FROM questions WHERE retired = 0 AND prompt = ?",
                 (old["Theory"] + " (edited)",)).fetchone()[0]
         self.assertIsNone(self._answer_with_score(successor, 5)["previous_score"])
@@ -1688,13 +1690,13 @@ class PreparatorTests(unittest.TestCase):
     # ---- TASK-018: guardrails, weak spots, lessons, CSV, 404s, selection ----
     def _question_row(self, mode):
         with preparator.app.app_context():
-            return preparator.get_db().execute(
+            return db.get_db().execute(
                 "SELECT * FROM questions WHERE mode = ? AND retired = 0 LIMIT 1", (mode,)
             ).fetchone()["id"]
 
     def _weakness_row(self, qid):
         with preparator.app.app_context():
-            row = preparator.get_db().execute(
+            row = db.get_db().execute(
                 "SELECT miss_count, pinned FROM weaknesses WHERE question_id = ?", (qid,)
             ).fetchone()
             return None if row is None else (row["miss_count"], row["pinned"])
@@ -1716,7 +1718,7 @@ class PreparatorTests(unittest.TestCase):
                     self.assertFalse(forbidden & set(body["question"]), body["question"].keys())
                     self.assertFalse(forbidden & set(body), body.keys())
                     with preparator.app.app_context():
-                        row = preparator.get_db().execute(
+                        row = db.get_db().execute(
                             "SELECT solution, explanation FROM questions WHERE id = ?",
                             (body["question"]["id"],),
                         ).fetchone()
@@ -1736,7 +1738,7 @@ class PreparatorTests(unittest.TestCase):
                 self.assertIn("keyword rubric", body["feedback_note"])
                 self.assertIn("not an AI judgment", body["feedback_note"])
                 with preparator.app.app_context():
-                    row = preparator.get_db().execute(
+                    row = db.get_db().execute(
                         "SELECT solution, explanation FROM questions WHERE id = ?", (qid,)
                     ).fetchone()
                 self.assertEqual(body["solution"], row["solution"])
@@ -1761,7 +1763,7 @@ class PreparatorTests(unittest.TestCase):
     def test_delete_weakness_removes_pinned_and_unpinned_rows(self):
         pinned = self._first_question_id()
         with preparator.app.app_context():
-            missed = preparator.get_db().execute(
+            missed = db.get_db().execute(
                 "SELECT id FROM questions WHERE retired = 0 AND id != ? LIMIT 1", (pinned,)
             ).fetchone()[0]
         self.client.post(f"/api/weakness/{pinned}", json={})
@@ -1776,7 +1778,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_weak_only_serves_only_weak_questions(self):
         with preparator.app.app_context():
-            ids = [r[0] for r in preparator.get_db().execute(
+            ids = [r[0] for r in db.get_db().execute(
                 "SELECT id FROM questions WHERE retired = 0 ORDER BY id LIMIT 3")]
         weak = ids[1]
         self._answer_with_score(weak, 2)
@@ -1847,7 +1849,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_unknown_question_id_is_404_on_question_and_answer(self):
         with preparator.app.app_context():
-            missing = preparator.get_db().execute("SELECT MAX(id) FROM questions").fetchone()[0] + 1000
+            missing = db.get_db().execute("SELECT MAX(id) FROM questions").fetchone()[0] + 1000
         self._assert_error(
             self.client.post("/api/question", json=self._search(question_id=missing)), 404, "Question not found."
         )
@@ -1864,7 +1866,7 @@ class PreparatorTests(unittest.TestCase):
 
     def test_least_practiced_question_is_served_first(self):
         with preparator.app.app_context():
-            database = preparator.get_db()
+            database = db.get_db()
             group = database.execute(
                 "SELECT topic, difficulty, mode FROM questions WHERE retired = 0 "
                 "GROUP BY topic, difficulty, mode HAVING COUNT(*) BETWEEN 2 AND 6 LIMIT 1"
