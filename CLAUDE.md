@@ -41,7 +41,7 @@ This table is the single source of truth for who may write where. Agent files po
 | backend-engineer | `app.py`, `db.py`, `question_bank.py`, `coding_variants.py`, `tests/`, `requirements.txt`, `requirements-dev.txt`, `.gitignore` (except the `docs/` line), `LICENSE`, `THIRD_PARTY_NOTICES.md`, `.github/`, `tools/editor-bundle/`, its own task file; `docs/architecture/api-contract.md` only to promote the PLANNED entry its task implements |
 | frontend-engineer | `templates/`, `static/` (except `static/vendor/`), its own task file; `docs/design/design-system.md` only the section(s) describing tokens or components its task changed |
 | review-engineer | `docs/reviews/<task-id>.md` only (appends one `## Round N` section per review) |
-| qa-engineer | `docs/qa/<task-id>/` (check scripts, screenshots), `tools/qa/` (shared helpers), `assets/screenshots/` (README screenshots, taken from a scratch database with demo data only), the "Manual check results" section and acceptance checkboxes of the task file it was given |
+| qa-engineer | `docs/qa/<task-id>/` (check scripts, screenshots), `tools/qa/` (shared helpers), `assets/screenshots/` (README screenshots, taken from a scratch database with demo data only), the "Manual check results" section and acceptance checkboxes of the task file it was given; for a task it owns (owner qa), also that task's "Implementation notes" |
 
 Nobody writes to `instance/` or `static/vendor/`.
 
