@@ -1,9 +1,13 @@
-# Development-only tools (not needed to run the app).
-# Install: .venv/Scripts/python.exe -m pip install -r requirements-dev.txt
-# Then once: .venv/Scripts/python.exe -m playwright install chromium
+# Development-only tools (not needed to run the app). Includes the runtime pins.
+# Install (Windows): .venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+# Install (Linux/macOS): .venv/bin/python -m pip install -r requirements-dev.txt
+# Then once: python -m playwright install chromium (with the same interpreter)
+-r requirements.txt
 
 # Headless browser checks for the qa-engineer (tools/qa/qa_browser.py)
 playwright==1.63.0
 
-# Linter (default rule set, no config file): ruff check app.py db.py question_bank.py coding_variants.py tests
+# Linter (default rule set, no config file):
+#   .venv/Scripts/python.exe -m ruff check app.py db.py question_bank.py coding_variants.py tests
+#   .venv/bin/python -m ruff check app.py db.py question_bank.py coding_variants.py tests
 ruff==0.16.10
