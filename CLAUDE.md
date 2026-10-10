@@ -69,6 +69,7 @@ The lead sets `- Size:` on every task, including the frontend tasks a designer w
    - **S and M features: one gate.** Show the human the lead's decisions and every task for the feature together: the lead's tasks and the designer-written frontend tasks, with sizes and the dispatch order. Nothing for the feature except its designer tasks is dispatched before this gate.
    - **L features: two gates**, so design work is not wasted on rejected decisions. First show the lead's decisions and tasks (between steps 2 and 3); only after approval does the designer run. Then show the designer-written frontend tasks, sized by the lead, before any of them is dispatched. Backend tasks approved at the first gate may start once their contract exists.
    - A guardrail change always needs its own explicit approval and an ADR.
+   - If the human changes a task's scope at a gate (adds or changes a requirement), send the task back to the lead for a spec update before dispatching it, whatever its size.
 5. backend-engineer and frontend-engineer implement their tasks and run the project checks and tests before reporting. They may run in parallel once the API contract exists. Never let both edit the same files (backend: Python + `tests/`; frontend: `templates/` + `static/`). For an L task, the lead re-checks it first (see "Task sizes").
 6. review-engineer reviews the one task you name (code or design; tell it the round number). It writes its report to `docs/reviews/<task-id>.md` itself.
    - CHANGES REQUESTED: send the task back to its author with the review; repeat step 6.
@@ -101,11 +102,12 @@ Update both after each approval gate, each task that reaches `done/` or `blocked
 - Pass small review notes forward: NITs from an approved task that touch the files of the next task in the same lane are added to that next dispatch. The implementer lists them in its notes under "Folded-in review NITs". Notes that belong to another owner go to that owner's next task or to the lead.
 - If an agent is cut off (rate limit, error), check what it left on disk before re-dispatching, and tell the new run to continue from that state.
 - Browser checks are run by qa-engineer (headless Playwright). Only what it cannot run (real screen-reader passes, anything needing an external site) stays unticked and marked "PENDING human" in the task file. A task may move to `done/` with PENDING human checks only if its review approved the code; list it in the next status report. A task whose risk depends on such a check stays in `review/` until it is verified.
-- Done tasks from before qa-engineer existed (TASK-001, 009, 013, 014, 020, 025) still carry "PENDING manual check" items: dispatch qa-engineer on them; TASK-002 stays in `review/` until TASK-001's check passes.
+- Real screen-reader passes cannot run headless; they stay "PENDING human" in their task files and are listed under the PENDING human checks in `docs/PLAN.md` (currently TASK-009, 014, 020, 063 and 064). Nothing in this list needs a dispatch.
 
 ## Rules
 - Move a task file to `in-progress/` before dispatching it.
-- Give each subagent the task file path, not a paraphrase.
+- Give each subagent the task file path, not a paraphrase. When you resume or re-dispatch an agent for a fix round, give the file's current path (it may have moved since the first dispatch).
+- Changes to agent configuration (`.claude/settings.json`, permissions) are prepared as an exact diff or block for the human to apply by hand; never script them.
 - Task IDs: `docs/tasks/NEXT_ID` holds the next free ID and only you update it. Before dispatching an agent that may create tasks (lead-engineer, designer), reserve a range (e.g. TASK-044 to TASK-050), tell the agent that range, and advance `NEXT_ID` past it.
 - Max 3 review rounds and 3 QA rounds per task, for code and design tasks alike (a fix-diff review counts as a review round); then escalate to the human.
 - Every bug fix comes with a regression test that fails without the fix: a unittest for backend behavior, a scripted step in `docs/qa/<task-id>/check.py` for frontend behavior. The reviewer treats a missing one as SHOULD-FIX.
