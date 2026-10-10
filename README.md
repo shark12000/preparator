@@ -1,18 +1,17 @@
 # Preparator
 
-<!-- CI badge: replace REPO-NAME in both URLs below with the GitHub repository name after the first push. -->
-[![CI](https://github.com/shark12000/REPO-NAME/actions/workflows/ci.yml/badge.svg)](https://github.com/shark12000/REPO-NAME/actions/workflows/ci.yml)
+[![CI](https://github.com/shark12000/preparator/actions/workflows/ci.yml/badge.svg)](https://github.com/shark12000/preparator/actions/workflows/ci.yml)
 
 Preparator is a local web app for practicing Python interview questions. It is for developers preparing for Python interviews who want to answer one question at a time, get transparent feedback, and come back to what they missed. It runs on your own computer, with no account, and keeps your progress in a local SQLite file.
 
 <table>
   <tr>
-    <td><img src="assets/screenshots/practice-coding-light.png" alt="Practice view, light theme: a coding question with a Python answer in the code editor" width="100%"></td>
-    <td><img src="assets/screenshots/feedback-dark.png" alt="Feedback after submitting, dark theme: rubric score, covered and missed concepts, explanation and model answer" width="100%"></td>
+    <td valign="top"><img src="assets/screenshots/practice-coding-light.png" alt="Practice view, light theme: a coding question with a Python answer in the code editor" width="100%"></td>
+    <td valign="top"><img src="assets/screenshots/feedback-dark.png" alt="Feedback after submitting a coding answer, dark theme: rubric score, concepts marked Covered or Not mentioned, the explanation, and your code next to the model solution" width="100%"></td>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/learn-light.png" alt="Learn view, light theme: a theory lesson with a personal note" width="100%"></td>
-    <td><img src="assets/screenshots/progress-dark.png" alt="Progress view, dark theme: totals, average match by day, topic by level grid" width="100%"></td>
+    <td valign="top"><img src="assets/screenshots/learn-light.png" alt="Learn view, light theme: a theory lesson with a personal note" width="100%"></td>
+    <td valign="top"><img src="assets/screenshots/progress-dark.png" alt="Progress view, dark theme: totals, average match by day, topic by level grid, recent attempts" width="100%"></td>
   </tr>
 </table>
 <p align="center"><img src="assets/screenshots/practice-mobile-light.png" alt="Practice view on a 390px-wide phone screen, light theme" width="260"></p>
@@ -172,7 +171,7 @@ Lessons learned:
 - Agents sometimes report more than they did (a half-done item marked "applied", a comment claiming something the code does not do); reviewers who check claims against the diff are essential.
 - Some steps stay with the human on purpose: guardrail changes, permission edits (applied by hand) and real screen-reader checks.
 
-**The human's role.** Nik Bondarciuk designed the agent team and workflow, made the product and architecture decisions at the approval gates, and directed the work. The lead engineer proposed the options and the human decided; the agents wrote the code, tests, design specs and reviews within those decisions.
+**My role.** I designed the agent team and its workflow, made the product and architecture decisions at the approval gates, and directed the work. The lead engineer agent proposed options and I decided; the agents wrote the code, tests, design specs and reviews within those decisions.
 
 ## License
 
