@@ -30,3 +30,6 @@ Thumbs.db
 
 # Personal learning space for the Sensei agent (local only, not committed)
 learning/
+
+# Private process folder: a separate local git repo (ADR-018)
+docs/
