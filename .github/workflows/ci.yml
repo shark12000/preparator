@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PREPARATOR_DATABASE: ${{ runner.temp }}/ci-preparator.sqlite3
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Lint (ruff)
+        run: python -m ruff check app.py db.py question_bank.py coding_variants.py tests
+      - name: Syntax check (compileall)
+        run: python -m compileall -q app.py db.py question_bank.py coding_variants.py tests
+      - name: Tests
+        run: python -m unittest discover -s tests
+      - name: JavaScript syntax check (app.js)
+        run: node --check static/app.js
+      - name: JavaScript syntax check (editor.js)
+        run: node --check static/editor.js

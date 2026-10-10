@@ -1,7 +1,8 @@
 # Development-only tools (not needed to run the app). Includes the runtime pins.
 # Install (Windows): .venv/Scripts/python.exe -m pip install -r requirements-dev.txt
 # Install (Linux/macOS): .venv/bin/python -m pip install -r requirements-dev.txt
-# Then once: python -m playwright install chromium (with the same interpreter)
+# Then once (Windows): .venv/Scripts/python.exe -m playwright install chromium
+# Then once (Linux/macOS): .venv/bin/python -m playwright install chromium
 -r requirements.txt
 
 # Headless browser checks for the qa-engineer (tools/qa/qa_browser.py)

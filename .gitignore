@@ -46,6 +46,6 @@ htmlcov/
 
 # Editor-bundle rebuild (README): npm install and the esbuild entry file
 node_modules/
-package.json
-package-lock.json
-entry.js
+/package.json
+/package-lock.json
+/entry.js
