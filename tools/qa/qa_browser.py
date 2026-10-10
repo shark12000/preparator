@@ -11,11 +11,11 @@ Usage from a QA script:
     with running_app() as base_url, sync_playwright() as pw:
         browser = pw.chromium.launch()
         page, errors = open_page(browser, base_url, theme="dark", width=390, path="/#learn")
-        page.screenshot(path="docs/qa/TASK-NNN/learn-dark-390.png", full_page=True)
+        page.screenshot(path="screenshots/learn-dark-390.png", full_page=True)
 
 Smoke check (all four views, both themes, desktop and 390px):
 
-    .venv/Scripts/python.exe -m tools.qa.qa_browser --smoke --out docs/qa/smoke
+    .venv/Scripts/python.exe -m tools.qa.qa_browser --smoke --out qa-smoke
 """
 
 from __future__ import annotations
