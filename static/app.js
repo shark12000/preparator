@@ -192,7 +192,7 @@ function showIntro() {
 
 const NO_MATCH_MESSAGE = "No questions match those filters. Change a filter and try again.";
 
-// Review rows of the error table (404 texts) arrive with TASK-065; until then review shows error.message.
+// The error table has no review-specific 404 texts yet, so review requests show error.message.
 function questionErrorMessage(error, { review }) {
   if (!review && error && error.status === 404) return NO_MATCH_MESSAGE;
   return error && error.message ? error.message : SERVER_ERROR_MESSAGE;
@@ -206,7 +206,7 @@ function clearBusy(button) {
   if (label && button.dataset.idleLabel !== undefined) label.textContent = button.dataset.idleLabel;
 }
 
-// The only caller of POST /api/question: Start, Next and review entry (TASK-065) all go through it.
+// The only caller of POST /api/question: Start, Next and review entry all go through it.
 async function requestQuestion({ button, questionId = null, weakOnly = false, errorId = "intro-error" } = {}) {
   const review = questionId !== null || weakOnly;
   if (!review && state.requesting) return;
@@ -226,7 +226,7 @@ async function requestQuestion({ button, questionId = null, weakOnly = false, er
   showError(errorId, "");
   announce("Loading question.");
   try {
-    // Review requests ignore the Practice filters (ADR-007).
+    // Review requests ignore the Practice filters.
     const body = review
       ? { weak_only: weakOnly, question_id: questionId ?? undefined }
       : { ...readFilters(), weak_only: false };
@@ -463,7 +463,7 @@ function weakStatus(question) {
 function startReview({ questionId = null, weakOnly = false } = {}) {
   setView("practice");
   showIntro();
-  // Stopgap until TASK-065: review failures (including 404) show error.message in the intro.
+  // Stopgap: review failures (including 404) show error.message in the intro until review gets its own error texts.
   const button = byId("start-button");
   button.focus();
   requestQuestion({ button, questionId, weakOnly });

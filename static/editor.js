@@ -1,4 +1,4 @@
-// CodeMirror 6 wrapper. The bundle in vendor/ is built once (see README) so the
+// CodeMirror 6 wrapper. The bundle in vendor/ is built once from tools/editor-bundle/ so the
 // app needs no build step and works offline.
 import {
   EditorView, basicSetup, python, keymap, indentWithTab, indentUnit, Prec,
