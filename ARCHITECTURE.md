@@ -1,6 +1,6 @@
 # Preparator Architecture
 
-This is the normative design document: what the system is, how it is divided, and the rules every change must keep. It is deliberately high level. Decision numbers such as "ADR-016" refer to architecture decision records in the team's private process record, which is not part of this repository; the rule stated here is the one that applies.
+This is the normative design document: what the system is, how it is divided, and the rules every change must keep. It is deliberately high level. The reasoning behind these rules is kept in architecture decision records in the team's private process record, which is not part of this repository; the rule stated here is the one that applies.
 
 ## Overview
 
@@ -21,10 +21,12 @@ Preparator is a local, single-user, single-process Flask application. Flask serv
 - `templates/index.html`: the single-page shell with the Practice, Learn, Weak spots and Progress views.
 - `static/app.js`: view state, hash routing, keyboard shortcuts, API requests, and rendering (including inline-SVG progress charts).
 - `static/editor.js`: a thin CodeMirror wrapper; `app.js` loads it lazily and falls back to a textarea if it fails.
-- `static/vendor/codemirror.js`: the prebuilt CodeMirror bundle (rebuild steps in `README.md`). Never edited by hand.
+- `static/vendor/codemirror.js`: the prebuilt CodeMirror bundle. Never edited by hand.
+- `tools/editor-bundle/`: the recipe that builds the CodeMirror bundle (`entry.js`, `package.json` with pinned versions, rebuild notes). Development only; nothing in it runs with the app.
 - `static/style.css`: light and dark design tokens, then components and responsive layouts. Components use tokens, not raw colors.
 - `tests/`: API and behavior tests, each on its own temporary SQLite database; rubric tests; bank-determinism tests and a committed baseline of question identities.
 - `tools/qa/`: headless-browser check helpers (Playwright) used during development; the app does not import them.
+- `assets/screenshots/`: the README screenshots, taken from a scratch database that holds demo data only.
 - `.github/workflows/ci.yml`: lint, syntax checks and the test suite on Linux and Windows, on every push and pull request, with a temporary database.
 - `requirements.txt` (exact runtime pins) and `requirements-dev.txt` (the runtime pins plus pinned ruff and Playwright).
 - `CLAUDE.md` and `.claude/agents/`: the AI-agent team setup that builds the project. The Agent Guardrails below apply to it.
@@ -35,6 +37,7 @@ Preparator is a local, single-user, single-process Flask application. Flask serv
 - `questions` holds the content copied from `QUESTION_BANK`: prompt, topic, difficulty, mode, rubric criteria, explanation, solution, optional starter code, and a `retired` flag.
   - A question's identity is (topic, difficulty, mode, prompt). Seeding inserts new identities and refreshes the content of existing ones in place, so editing a prompt's text creates a new row while editing its rubric or explanation does not.
   - Rows whose identity left the bank are marked retired, never deleted: they are not served, listed or counted, but the user's history on them is kept.
+  - Selection and listing filter out retired rows and old duplicate rows (identical identities left by earlier seeding) through the shared canonical and active predicates in `db.py`.
   - Because the prompt is part of the identity, bank prompts must be byte-identical across processes (no hash-order dependence).
   - A rubric criterion is `{label, keywords}` with optional `related` terms (half credit) and `alternatives` (full credit). These live in the criteria JSON and need no schema change.
 - `attempts` stores each submitted answer, its rubric score and a timestamp. The score is always the rubric's.
@@ -47,7 +50,8 @@ Rules for every schema change:
 - Changes go through the versioned migrations in `db.py` (tracked in `PRAGMA user_version`). Steps are additive only: new tables, new columns with defaults, new indexes. They never rewrite or drop user data.
 - Migrations and seeding run once per database file per process, in one transaction.
 - A database whose schema is newer than the code is refused, not used: `python app.py` exits with a message, and other runners fail every database route with a generic 500 and write nothing.
-- Planned progress backup: a JSON file that refers to questions by identity, never by row id. Import is the only path where outside data enters the database, so it is validated all-or-nothing and merges without deleting.
+
+Planned progress backup: a JSON file that refers to questions by identity, never by row id. Import is the only path where outside data enters the database, so it is validated all-or-nothing and merges without deleting.
 
 ## Client-side state
 
@@ -60,9 +64,9 @@ Browser `localStorage` holds volatile UI state only; SQLite holds all durable pr
 
 ## Boundaries
 
-- **Network.** The server binds to 127.0.0.1 and makes no outbound calls. A `before_request` guard rejects foreign `Host` headers (DNS rebinding), cross-origin writes, and non-JSON POSTs under `/api/`. There are no sessions, cookies or CSRF tokens. The browser loads web fonts from Google Fonts; nothing else leaves the machine.
+- **Network.** The server binds to 127.0.0.1 and makes no outbound calls. A `before_request` guard rejects foreign `Host` headers on every route (DNS rebinding), and cross-origin writes and non-JSON POSTs under `/api/`. There are no sessions, cookies or CSRF tokens. The browser loads web fonts from Google Fonts; nothing else leaves the machine.
 - **Errors.** Every `/api/` error is a JSON `{"error": "..."}` with a fixed message; tracebacks are logged, never sent.
-- **Solutions.** The question response never contains the solution, explanation or criteria; they are returned only after an answer is submitted. A theory lesson's answer content stays locked until its question has at least one attempt.
+- **Solutions.** The question response never contains the solution, explanation or criteria; they are returned only after an answer is submitted. A theory lesson's answer content stays locked, in Learn and in the CSV export, until its question has at least one attempt.
 - **Submitted code** is stored as text and never executed.
 - **Exports.** The CSV export neutralizes formula-like cells. Spreadsheet use is by file import; there are no credentials in the app.
 - **Modules.** `db.py` does not import `app`. Frontend files never call SQLite or Python directly; they use the JSON API. Content changes go through `question_bank.py` / `coding_variants.py`, never through the database.
@@ -92,7 +96,7 @@ The default URL is `http://127.0.0.1:5000`. Environment variables: `PORT` change
 ## Agent Guardrails
 
 - Preserve one-question-at-a-time behavior. Do not include a solution in the question response; reveal it only after answer submission.
-- The practice flow has no search or source-confirmation step before a question (human decision 2026-10-04, ADR-016). This replaces the former guardrail "Keep source confirmation before question delivery" (removed from the code by TASK-061 and TASK-063).
+- The practice flow has no search or source-confirmation step before a question (human decision 2026-10-04). This replaces the former guardrail "Keep source confirmation before question delivery", which has been removed from the code.
 - Keep rubric scoring labeled as heuristic; it is not semantic or AI grading.
 - Coding prompts provide a textarea starter and accept submitted source as text. Submitted Python is not executed by the app.
 - Test database behavior with temporary databases. Avoid mutating `instance/preparator.sqlite3` in tests.
