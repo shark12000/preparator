@@ -1,0 +1,19 @@
+{
+  "name": "preparator-editor-bundle",
+  "private": true,
+  "description": "Rebuild recipe for static/vendor/codemirror.js (CodeMirror 6 editor bundle used by Preparator)",
+  "license": "MIT",
+  "scripts": {
+    "build": "esbuild entry.js --bundle --format=esm --minify --outfile=../../static/vendor/codemirror.js"
+  },
+  "devDependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-python": "6.2.1",
+    "@codemirror/language": "6.12.4",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.13",
+    "@lezer/highlight": "1.2.5",
+    "codemirror": "6.0.2",
+    "esbuild": "0.28.2"
+  }
+}

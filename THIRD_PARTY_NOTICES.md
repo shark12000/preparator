@@ -4,7 +4,7 @@ Preparator itself is licensed under the MIT License (see `LICENSE`).
 
 ## Editor bundle: `static/vendor/codemirror.js`
 
-`static/vendor/codemirror.js` is a minified esbuild bundle (see "Rebuilding the editor bundle" in `README.md`). It has no license header, so the packages it is built from are listed here. All of them are MIT-licensed, copyright Marijn Haverbeke and others:
+`static/vendor/codemirror.js` is a minified esbuild bundle (rebuild recipe: `tools/editor-bundle/`). It has no license header, so the packages it is built from are listed here. All of them are MIT-licensed, copyright Marijn Haverbeke and others:
 
 - `codemirror`
 - `@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/language`, `@codemirror/autocomplete`, `@codemirror/search`, `@codemirror/lint`, `@codemirror/lang-python`
