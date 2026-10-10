@@ -104,6 +104,7 @@ tools/qa/               headless-browser check helpers (Playwright)
 tools/editor-bundle/    recipe for rebuilding static/vendor/codemirror.js
 assets/screenshots/     the images in this README
 ARCHITECTURE.md         design rules, boundaries and guardrails
+DEVELOPMENT_STORY.md    how I designed and ran the agent team, and what I learned
 CLAUDE.md, .claude/     the AI agent team setup (see below)
 ```
 
@@ -135,6 +136,8 @@ flowchart LR
 ## Built with a multi-agent AI team
 
 Preparator was built by a team of Claude Code agents. Their instructions are in `CLAUDE.md` and `.claude/agents/`, and every agent may write only to its own files. The team's working record (task board, reviews, QA evidence, decision records) is kept in a private repository and is not part of this one.
+
+The dated story of the build is in [DEVELOPMENT_STORY.md](DEVELOPMENT_STORY.md). It covers how I designed the team, audited it, closed its verification gap with a QA agent, made it survive crashes and token limits, cut its cost, and shipped it safely.
 
 ```mermaid
 flowchart TD
@@ -172,6 +175,28 @@ Lessons learned:
 - Some steps stay with the human on purpose: guardrail changes, permission edits (applied by hand) and real screen-reader checks.
 
 **My role.** I designed the agent team and its workflow, made the product and architecture decisions at the approval gates, and directed the work. The lead engineer agent proposed options and I decided; the agents wrote the code, tests, design specs and reviews within those decisions.
+
+Some of what that meant in practice:
+
+- **Testing the setup, not trusting it.** A review of the agent setup found agent files that contradicted `CLAUDE.md`, and no agent able to run the browser checks the process required. I had both fixed: one write-areas table as the single source of truth, deny rules in `.claude/settings.json`, and a QA agent running headless Playwright.
+- **Designing for failure and cost.** Checkpoint files, WIP commits and a recovery procedure let a session stop at any point without losing work. Task sizes and model routing (Opus to plan and review, Sonnet to execute) keep small changes cheap.
+- **Using my own product.** My own answer scored 3/10 even though it used try/except, a valid approach, so I asked for graded rubric feedback. I had the web-search step before each question removed and approved the guardrail change.
+
+The full story, with the trade-offs, is in [DEVELOPMENT_STORY.md](DEVELOPMENT_STORY.md).
+
+## AI engineering concepts applied
+
+The app itself uses no AI model. Its scoring is a transparent keyword rubric. AI was used only to build it:
+
+- **Multi-agent orchestration:** the main session dispatches seven specialist subagents and is the only one that moves tasks and commits.
+- **Human-in-the-loop gates:** I approve decisions and tasks before work starts, and every guardrail change needs my explicit approval.
+- **Evaluator-optimizer loop:** a separate review agent sends each task back to its author until it approves, for at most 3 rounds before the task comes to me.
+- **Model routing:** Opus for the lead and the reviewer, Sonnet for the other agents and for reviews of small tasks.
+- **Least-privilege tool access:** per-agent `tools:` lists, a write-areas table, and `.claude/settings.json` deny rules for the real database and the vendored bundle.
+- **Shared file-based state and checkpoints:** agents coordinate through a task board, an API contract and plan and handoff files, so a crashed session resumes from disk.
+- **Contract-first development:** each endpoint goes into the API contract before work starts, so backend and frontend build in parallel.
+- **Prompt and context engineering:** each subagent runs in its own context, with a role definition in `.claude/agents/` and a dispatch that names the task file and the files it must not touch.
+- **Agentic web research:** the designer's specs rest on web research notes that cite their sources (for example WCAG guidance).
 
 ## License
 
