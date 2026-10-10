@@ -1,60 +1,81 @@
 # Preparator Architecture
 
+This is the normative design document: what the system is, how it is divided, and the rules every change must keep. It is deliberately high level. Decision numbers such as "ADR-016" refer to architecture decision records in the team's private process record, which is not part of this repository; the rule stated here is the one that applies.
+
 ## Overview
 
-Preparator is a local, single-process Flask application. Flask serves one HTML page and JSON endpoints; browser JavaScript switches views and calls those endpoints. SQLite stores practice history, review items, and saved theory notes. There is no frontend build step, account system, LLM, or direct Google Sheets connection.
+Preparator is a local, single-user, single-process Flask application. Flask serves one HTML page and a small JSON API; browser JavaScript switches views and calls those endpoints. SQLite stores practice history, review items and saved theory notes. It runs on localhost only. There is no frontend build step, account system, LLM, or direct Google Sheets connection.
+
+## Stack
+
+- Python 3.14, Flask 3 (exact pins in `requirements.txt`), SQLite through the standard-library `sqlite3` module.
+- Vanilla JavaScript ES modules and plain CSS with design tokens. A prebuilt CodeMirror 6 bundle is vendored; nothing is compiled at install or run time.
+- Tests: `unittest`. Lint: ruff, default rule set, no config file. JavaScript is checked with `node --check`. There is no type checker.
 
 ## Project Map
 
-- `app.py` contains Flask configuration, the localhost guard and error handler, request handlers (HTTP validation and responses), rubric scoring, question selection, the streak, and CSV export. It reaches the database only through `db` (`import db`, qualified names such as `db.get_db()`).
-- `db.py` (ADR-015, TASK-051) owns the SQLite side: the connection lifecycle (`get_db`, `close_db`, registered on the app by `init_app`), the versioned migrations (`MIGRATIONS`, `run_migrations`, `SchemaTooNewError`), one-time initialization and seeding (`init_db`, `seed_questions`), `utc_now`, and the shared SQL predicates `CANONICAL_QUESTION` and `ACTIVE_QUESTION`. It never imports `app`. Tests patch these names on `db`, never on `app`.
-- `question_bank.py` holds the hand-written prompts and appends the generated coding variants into `QUESTION_BANK`.
-- `coding_variants.py` generates 312 deterministic coding prompts from 24 original problem types and varied sample inputs.
-- `templates/index.html` defines the single-page shell and its Practice, Learn, Weak spots, and Progress views.
-- `static/app.js` (ES module) owns view state, hash routing, keyboard shortcuts, API requests, and rendering of questions, lessons, weak spots, and progress charts (inline SVG).
-- `static/editor.js` wraps CodeMirror for coding answers; `app.js` imports it lazily and falls back to a textarea if it fails.
-- `static/vendor/codemirror.js` is a prebuilt CodeMirror 6 bundle (see README to rebuild). Do not edit by hand.
-- `static/style.css` defines design tokens (colors, type scale) for light and dark themes, then components and responsive layouts. Use tokens rather than raw hex values.
-- `tests/test_app.py` exercises API behavior with an isolated temporary SQLite database. `tests/test_rubric.py` covers the graded rubric (criterion states, scores, the bank shape of `related` and `alternatives`) and the `concepts` field of `POST /api/answer` (TASK-067, TASK-092). `tests/test_bank_determinism.py` checks that bank identities do not depend on the hash seed, and `tests/bank_identities.json` (written by `tests/bank_identities.py`) pins the current identities (ADR-005 addendum).
-- `instance/preparator.sqlite3` is the local persistent database. Do not use it as a test database.
-- `requirements.txt` lists the Python runtime dependency (`Flask>=3.1,<4`, TASK-019: ADR-002 and the planned per-route body limit of ADR-010 rely on Flask 3.1); `requirements-dev.txt` lists development-only tools (pinned Playwright for the browser checks in `tools/qa/`, pinned ruff for linting, ADR-006). `.vscode/tasks.json` provides the local run task.
+- `app.py`: the web side. Flask configuration, the localhost guard and error handler, request handlers (HTTP validation and responses), rubric scoring, question selection, the practice streak and the CSV export. It reaches the database only through `db` (`import db` and qualified names such as `db.get_db()`).
+- `db.py`: the database side. Connection lifecycle, versioned schema migrations, one-time initialization and seeding from the question bank, and the shared SQL predicates for canonical and active questions. It never imports `app`. Tests patch database names on `db`, never on `app`.
+- `question_bank.py`: the hand-written prompts, extended with the generated coding variants into `QUESTION_BANK`, the single content source.
+- `coding_variants.py`: 312 deterministic coding prompts generated from 24 problem types.
+- `templates/index.html`: the single-page shell with the Practice, Learn, Weak spots and Progress views.
+- `static/app.js`: view state, hash routing, keyboard shortcuts, API requests, and rendering (including inline-SVG progress charts).
+- `static/editor.js`: a thin CodeMirror wrapper; `app.js` loads it lazily and falls back to a textarea if it fails.
+- `static/vendor/codemirror.js`: the prebuilt CodeMirror bundle (rebuild steps in `README.md`). Never edited by hand.
+- `static/style.css`: light and dark design tokens, then components and responsive layouts. Components use tokens, not raw colors.
+- `tests/`: API and behavior tests, each on its own temporary SQLite database; rubric tests; bank-determinism tests and a committed baseline of question identities.
+- `tools/qa/`: headless-browser check helpers (Playwright) used during development; the app does not import them.
+- `.github/workflows/ci.yml`: lint, syntax checks and the test suite on Linux and Windows, on every push and pull request, with a temporary database.
+- `requirements.txt` (exact runtime pins) and `requirements-dev.txt` (the runtime pins plus pinned ruff and Playwright).
+- `CLAUDE.md` and `.claude/agents/`: the AI-agent team setup that builds the project. The Agent Guardrails below apply to it.
+- `instance/preparator.sqlite3`: the user's local database. Not in the repository, and never used by tests.
 
 ## Data Model
 
-- `questions` stores prompts, topic, difficulty, mode, answer criteria, explanations, examples, optional starter code, and a `retired` flag. `init_db()` runs once per database file per process, on the first connection (ADR-003). In one transaction it applies pending schema migrations and then seeds: it inserts new prompts from `QUESTION_BANK` and refreshes criteria, explanation, solution, and starter code on existing rows (matched by topic, difficulty, mode, and prompt), so editing a prompt's text creates a new row while editing its content updates in place. Rows whose identity is no longer in the bank are marked `retired` (ADR-005): they are never served for practice or listed in Learn or Weak spots, and not counted in the bank size, but they are kept so user history stays attached (their attempts still count in the progress aggregates, and saved lessons on them stay in the CSV export). Because the prompt is part of the identity, bank prompts must be byte-identical across processes, and a changed prompt retires its row with no merge migration (ADR-005 addendum).
-  A rubric criterion is `{label, keywords}` with optional `related` terms (partial credit, half weight) and `alternatives` (`{label, keywords}`, full credit, shown as "Also valid") (ADR-017, TASK-067). These live in the `criteria` JSON, so they need no schema change.
-- `attempts` stores each submitted answer, rubric score, and timestamp. The score is always the rubric's; nothing the user marks afterwards changes it.
-- `rubric_overrides` (ADR-017, migration step 4, TASK-068) records "I covered this" per attempt and criterion (index plus a label snapshot). It is kept apart from the score, the weak queue and the aggregates, and exists to show the user's mark and to find rubrics that miss real answers.
-- `weaknesses` tracks questions to revisit, including misses and user-pinned items.
-- `review_schedule` (planned, ADR-008, migration step 5, TASK-083) holds one spaced-repetition row per answered question (`interval_days`, local `due_date`). It is separate from `weaknesses`: neither reads or writes the other.
-- `saved_lessons` stores theory question IDs with a personal note, a `saved` flag, and a save timestamp. Unsaving a lesson clears the flag and keeps a non-empty note (ADR-004).
+- `questions` holds the content copied from `QUESTION_BANK`: prompt, topic, difficulty, mode, rubric criteria, explanation, solution, optional starter code, and a `retired` flag.
+  - A question's identity is (topic, difficulty, mode, prompt). Seeding inserts new identities and refreshes the content of existing ones in place, so editing a prompt's text creates a new row while editing its rubric or explanation does not.
+  - Rows whose identity left the bank are marked retired, never deleted: they are not served, listed or counted, but the user's history on them is kept.
+  - Because the prompt is part of the identity, bank prompts must be byte-identical across processes (no hash-order dependence).
+  - A rubric criterion is `{label, keywords}` with optional `related` terms (half credit) and `alternatives` (full credit). These live in the criteria JSON and need no schema change.
+- `attempts` stores each submitted answer, its rubric score and a timestamp. The score is always the rubric's.
+- `rubric_overrides` records the user's "I covered this" marks per attempt and criterion. It is kept apart from the score, the weak-spot queue and the aggregates.
+- `weaknesses` is the queue of questions to revisit: misses and user-pinned items.
+- `saved_lessons` stores saved theory lessons with a personal note. Unsaving keeps a non-empty note.
+- Planned: a `review_schedule` table for spaced repetition (one row per answered question), separate from `weaknesses`; neither reads or writes the other.
 
-Schema changes go through the versioned migrations in `db.py` (`MIGRATIONS`, tracked in `PRAGMA user_version`, ADR-003). Steps are additive only: new tables, new columns with defaults, new indexes; they never rewrite or drop user data. A database whose version is newer than the code is refused rather than used (ADR-014, TASK-050): `python app.py` exits with a message, and other runners fail every database route with the generic 500 and write nothing.
-
-Progress backup (ADR-010, planned: TASK-086 export, TASK-087 import) is a JSON file that refers to questions by identity, never by row id. Import is the only path where outside data enters the database, so it is validated all-or-nothing and merges without deleting.
-
-The question bank is currently the source of truth for lesson and interview content. Duplicate question rows from older development reloads are filtered by canonical prompt identity when selecting or listing questions.
+Rules for every schema change:
+- Changes go through the versioned migrations in `db.py` (tracked in `PRAGMA user_version`). Steps are additive only: new tables, new columns with defaults, new indexes. They never rewrite or drop user data.
+- Migrations and seeding run once per database file per process, in one transaction.
+- A database whose schema is newer than the code is refused, not used: `python app.py` exits with a message, and other runners fail every database route with a generic 500 and write nothing.
+- Planned progress backup: a JSON file that refers to questions by identity, never by row id. Import is the only path where outside data enters the database, so it is validated all-or-nothing and merges without deleting.
 
 ## Client-side state
 
-Browser `localStorage` holds volatile UI state only; SQLite holds all durable progress (attempts, weak spots, saved lessons and notes). Anything in `localStorage` may disappear when the user clears browser data, and the app must keep working when storage is unavailable (all access is best effort, errors ignored).
+Browser `localStorage` holds volatile UI state only; SQLite holds all durable progress. Anything in `localStorage` may disappear when the user clears browser data, and the app must keep working when storage is unavailable (all access is best effort, errors ignored).
 
-- Today: `preparator-theme` (light/dark) and `preparator-filters` (Practice filters).
-- Planned (ADR-011, TASK-033): `preparator-draft:<question_id>` answer drafts.
-- Planned (ADR-012, amended by ADR-016; design TASK-093): `preparator-open-question`, a pointer to the revealed but unsubmitted question so it can be resumed after a reload with one click (a targeted question request; no search step).
+- Today: `preparator-theme` (light or dark) and `preparator-filters` (Practice filters).
+- Planned: per-question answer drafts, and a pointer to a revealed but unsubmitted question so it can be resumed after a reload.
 
-`localStorage` never holds solutions, explanations or criteria, and it is not part of the progress backup (ADR-010). Moving any of this into SQLite needs a write endpoint (ADR-002) and is only worth it if drafts must survive a browser data wipe.
+`localStorage` never holds solutions, explanations or criteria, and it is not part of the progress backup. Moving any of it into SQLite needs a write endpoint behind the localhost guard.
+
+## Boundaries
+
+- **Network.** The server binds to 127.0.0.1 and makes no outbound calls. A `before_request` guard rejects foreign `Host` headers (DNS rebinding), cross-origin writes, and non-JSON POSTs under `/api/`. There are no sessions, cookies or CSRF tokens. The browser loads web fonts from Google Fonts; nothing else leaves the machine.
+- **Errors.** Every `/api/` error is a JSON `{"error": "..."}` with a fixed message; tracebacks are logged, never sent.
+- **Solutions.** The question response never contains the solution, explanation or criteria; they are returned only after an answer is submitted. A theory lesson's answer content stays locked until its question has at least one attempt.
+- **Submitted code** is stored as text and never executed.
+- **Exports.** The CSV export neutralizes formula-like cells. Spreadsheet use is by file import; there are no credentials in the app.
+- **Modules.** `db.py` does not import `app`. Frontend files never call SQLite or Python directly; they use the JSON API. Content changes go through `question_bank.py` / `coding_variants.py`, never through the database.
 
 ## Main Flows
 
 1. `GET /` serves the application shell.
-2. Practice opens on an intro with the filters and one primary button; pressing it serves the question (nothing is requested on page load; ADR-016 decision 7). `POST /api/question` returns one question chosen by the filters (least practiced first), or the weak-spot queue in review mode. An optional `question_id` serves that specific question (used by "Practice this one" in Weak spots). There is no search or confirmation step (ADR-016); legacy `source_confirmed`, `source_url` and `search_query` fields are ignored if sent.
-   Status: implemented (server TASK-061, intro TASK-063). Planned: `due_only` serves questions due for review today, with no fallback when none are due (ADR-008, PLANNED-17, TASK-084).
-3. `POST /api/answer` applies a keyword rubric, stores the attempt, updates the weakness queue, and returns per-concept states (covered, partly covered, not detected; no "wrong" state) with matched terms, the attempt id, `previous_score`, theory, and the example solution (ADR-017, TASK-067). `POST`/`DELETE /api/attempts/<id>/overrides` record "I covered this" without changing the score (TASK-068). The feedback UI for concept states and overrides is TASK-075 to 077. Planned: `schedule` (next review date) in the response (PLANNED-16, TASK-083).
-4. `GET /api/dashboard` returns totals, per-topic and topic × level averages, a daily trend (local dates), the practice streak, weak spots, and recent attempts.
-5. `GET /api/theory` lists theory-mode questions as lessons. `POST` and `DELETE /api/theory/<id>` save or remove a lesson; saved notes are updated through the same `POST` endpoint. A lesson's explanation, model answer and key points stay locked until its question (that row id) has at least one attempt (ADR-001 option A; server and CSV implemented by TASK-004; the locked-lesson UI is TASK-006, designed in TASK-005).
-6. `GET /api/theory/export.csv` exports saved lessons and notes (Explanation and Example empty while a lesson is locked) as formula-neutralized CSV for import into Google Sheets. There is no OAuth or automatic spreadsheet sync.
-7. Planned: `GET /api/questions/<id>/attempts` returns the user's own earlier answers to one question, never the solution (ADR-011, PLANNED-18, TASK-089). `GET /api/backup.json` and `POST /api/backup/import` back up and merge all progress (ADR-010, PLANNED-19/20, TASK-086/087).
+2. Practice opens on an intro with the filters and one primary button; pressing it requests a question (nothing is requested on page load). `POST /api/question` returns one question chosen by the filters (least practiced first), or from the weak-spot queue in review mode, or a specific question by `question_id`. There is no search or confirmation step. Planned: a "due today" mode driven by the review schedule.
+3. `POST /api/answer` applies the keyword rubric, stores the attempt, updates the weak-spot queue, and returns per-concept states (covered, partly covered, not detected; no "wrong" state), the previous score, the theory and the example solution. The attempt-override endpoints record "I covered this" without changing the score.
+4. `GET /api/dashboard` returns totals, per-topic and topic-by-level averages, a daily trend in local dates, the practice streak, weak spots and recent attempts.
+5. `GET /api/theory` lists theory questions as lessons; `POST` and `DELETE /api/theory/<id>` save or remove a lesson and update its note.
+6. `GET /api/theory/export.csv` exports saved lessons and notes as formula-neutralized CSV for import into Google Sheets.
+7. Planned: a read-only history of the user's own earlier answers to one question (never the solution), and progress backup export and merge-import.
 
 ## Local Development
 
@@ -64,9 +85,9 @@ python -m unittest discover -s tests
 python -m ruff check app.py db.py question_bank.py coding_variants.py tests
 ```
 
-The lint check is ruff (ADR-006, TASK-019), installed from `requirements-dev.txt`. It runs with ruff's default rule set and no config file, and must exit 0. A finding is fixed, or suppressed inline with `# noqa: <code>` plus a short reason when the fix would change behavior. There is no type checker and no JS linter; JS files are checked with `node --check`.
+Install with `pip install -r requirements.txt` (runtime) or `pip install -r requirements-dev.txt` (runtime plus ruff and Playwright). Pins are exact; update them together and run the tests. ruff must exit 0; a finding is fixed, or suppressed inline with `# noqa: <code>` plus a short reason when the fix would change behavior. CI runs the same lint, syntax and test commands.
 
-The default URL is `http://127.0.0.1:5000`. `PORT` changes the listen port; `PREPARATOR_DATABASE` changes the SQLite file path. The Flask development server is intended for local practice only. Debug mode (reloader and interactive debugger) is off unless `FLASK_DEBUG=1` is set (TASK-010); never enable it when anything other than you can reach the port.
+The default URL is `http://127.0.0.1:5000`. Environment variables: `PORT` changes the listen port; `PREPARATOR_DATABASE` changes the SQLite file path (tests and experiments must point it at a scratch file); `FLASK_DEBUG=1` turns on the reloader and interactive debugger, which are off otherwise. The Flask development server is intended for local practice only; never enable debug mode when anything other than you can reach the port.
 
 ## Agent Guardrails
 
@@ -88,33 +109,7 @@ Keep the current structure while the app remains small. As features grow, refact
 4. Add direct Sheets sync only behind a dedicated integration boundary with explicit authorization; retain CSV export as a credential-free fallback.
 5. Add authentication, CSRF protection, and a production WSGI server before exposing the app beyond localhost.
 
-Status of step 1 (ADR-003, ADR-015): **done** (2026-10-07). The versioned migration mechanism (`PRAGMA user_version`) came first (TASK-007; schema version 4 after TASK-008, TASK-012 and TASK-068). TASK-051 then moved the connection, migration and seeding code into `db.py`, behavior unchanged; `app.py` went from about 800 to about 600 lines, and `db.py` is about 220. Every new schema step (5 onward) and the review-schedule replay go into `db.py`.
-
-Step 2 was to be revisited when the backup import was designed. Decision 2026-10-05: not yet. The import (TASK-087) is one handler plus a validator and a merge function in `app.py`; splitting services for it alone adds structure before there is a second consumer. Revisit step 2 when `app.py` (about 600 lines after TASK-051) passes about 1,000 lines with the backup tasks, or when a second feature needs the same merge or validation code. Step 3 is not started.
-
-## Architecture Decisions
-
-Decisions are recorded in `docs/architecture/adr/`. Planned API changes are in `docs/architecture/api-contract.md` under "Planned changes".
-
-| ADR | Title | Status |
-|---|---|---|
-| ADR-001 | Learn view exposes Theory answers before submission | Accepted, option A: lock until the first attempt (human decision 2026-10-05; backend implemented by TASK-004, design TASK-005 done; frontend TASK-006 not yet done) |
-| ADR-002 | Protect the localhost API from cross-site requests and DNS rebinding | Accepted |
-| ADR-003 | Safe one-time DB initialization and versioned schema migrations | Accepted |
-| ADR-004 | Lesson notes survive "Remove from saved" | Accepted |
-| ADR-005 | Retire question rows that are no longer in the bank | Accepted |
-| ADR-006 | Python lint tooling, and how frontend fixes are verified | Accepted (ruff and the Flask `>=3.1,<4` bound implemented by TASK-019; mypy still deferred) |
-| ADR-007 | Practice flow product decisions | Accepted (decisions 1 and 6 superseded, decision 4 reworded by ADR-016) |
-| ADR-008 | Spaced-repetition review schedule, separate from the weak-spot queue | Accepted (not yet implemented: TASK-083, 084 backend, TASK-085 design) |
-| ADR-009 | Source confirmation once per mock-interview session | Superseded by ADR-016 |
-| ADR-010 | Progress backup format and import validation rules | Accepted, amended 2026-10-05 (self-assessments included; not yet implemented: TASK-086, 087 backend, TASK-088 design) |
-| ADR-011 | Answer drafts in localStorage; read-only, solution-free attempt history | Accepted (`previous_score` done by TASK-049; not yet implemented: drafts TASK-033, history TASK-089, 090, 091) |
-| ADR-012 | Resume an unfinished question after reload, through the search gate | Accepted, amended by ADR-016 (resume is one click, no search; not yet implemented: design TASK-093, after TASK-033) |
-| ADR-013 | Open items from the Learn and Practice designs (notes, weak-spot removal, export, copy) | Accepted (decisions 7 and 9 implemented by TASK-050 and TASK-049; the frontend items are in the Learn and Practice task backlog) |
-| ADR-014 | Refuse to open a database whose schema is newer than the code | Accepted (implemented by TASK-050) |
-| ADR-015 | Move the database code out of `app.py` into `db.py` | Implemented (TASK-051, 2026-10-07) |
-| ADR-016 | Remove the search and source-confirmation step before a question | Accepted (human approval 2026-10-04; changes a guardrail; implemented by TASK-061 and TASK-063; TASK-064 to 066 refine the flow) |
-| ADR-017 | Graded rubric feedback (partial matches, accepted alternatives) and recorded self-assessment | Accepted (no guardrail change; backend implemented by TASK-067, 068, 069, and the rubric fixes by TASK-092; design TASK-070; frontend TASK-075 to 077 not yet done) |
-| ADR-018 | Public code repository, private `docs/` repository | Accepted (human decisions 2026-10-10; no guardrail change; TASK-100 to 103) |
-
-Notes: ADR-008 (2026-10-05) gives the review schedule migration step 5 in `db.py`, replays by `created_at` then `id`, and moves `WEAK_SCORE_THRESHOLD` to `db.py`. ADR-010 (2026-10-05) adds self-assessments to backup format 1. ADR-011 (2026-10-05) keeps history solution-free after ADR-001. ADR-002 and ADR-005 carry 2026-10-04 clarifications (the `[::1]` rationale; the determinism addendum). ADR-001, ADR-007, ADR-009, ADR-011 and ADR-012 carry 2026-10-04 notes pointing to ADR-016.
+Status:
+- Step 1 is **done**: versioned migrations exist, and the connection, migration and seeding code lives in `db.py` (`app.py` about 600 lines, `db.py` about 220). Every new schema step goes into `db.py`.
+- Step 2 is **not yet**: planned features such as the backup import are one handler plus a validator and a merge function, and a service layer for one consumer adds structure too early. Revisit when `app.py` passes about 1,000 lines, or when a second feature needs the same merge or validation code.
+- Step 3 is not started. Publishing the source code does not change the deployment model: the app is still local and single-user, so steps 3 and 5 remain unneeded until it must run anywhere other than the user's own machine.
