@@ -3,7 +3,7 @@
 Local Python interview-practice app. See `README.md` for features and `ARCHITECTURE.md` (repo root) for the design and the agent guardrails.
 
 ## Project facts
-- Backend: Python 3.14, Flask 3, SQLite (stdlib `sqlite3`) in `app.py`, `question_bank.py`, `coding_variants.py`, and `db.py` (connection, migrations and seeding, moved out of `app.py` by TASK-051 per ADR-015); tests in `tests/` (unittest).
+- Backend: Python 3.14, Flask 3, SQLite (stdlib `sqlite3`) in `app.py`, `question_bank.py`, `coding_variants.py`, and `db.py` (connection, migrations and seeding); tests in `tests/` (unittest).
 - Schema: versioned migrations in `db.py` (`MIGRATIONS`, `PRAGMA user_version`); add a new step for every schema change. Steps are additive only.
 - Frontend: `templates/index.html`, `static/app.js`, `static/editor.js`, `static/style.css` (vanilla JS ES modules, CSS tokens, no build step). `static/vendor/codemirror.js` is a prebuilt bundle; do not hand-edit.
 - API contract (private, in `docs/`): `docs/architecture/api-contract.md` (current endpoints plus PLANNED changes). As-built description of the code (private, in `docs/`): `docs/architecture/as-built.md` (the repo-root `ARCHITECTURE.md` is the normative one).
@@ -38,7 +38,7 @@ This table is the single source of truth for who may write where. Agent files po
 | ideator | `docs/ideas/` |
 | lead-engineer | repo-root `ARCHITECTURE.md`, `README.md`, `docs/architecture/` (api-contract.md, as-built.md, adr/, agent-workflow.md, retros/), `docs/tasks/` (new task files; the `Size` line of any task), `docs/ideas/` (decision sections only) |
 | designer | `docs/design/` (audit.md, design-system.md, specs, research/), `docs/tasks/` (new frontend task files, and its own task file) |
-| backend-engineer | `app.py`, `db.py`, `question_bank.py`, `coding_variants.py`, `tests/`, `requirements.txt`, `requirements-dev.txt`, `.gitignore` (except the `docs/` line), `LICENSE`, `THIRD_PARTY_NOTICES.md`, `.github/`, its own task file; `docs/architecture/api-contract.md` only to promote the PLANNED entry its task implements |
+| backend-engineer | `app.py`, `db.py`, `question_bank.py`, `coding_variants.py`, `tests/`, `requirements.txt`, `requirements-dev.txt`, `.gitignore` (except the `docs/` line), `LICENSE`, `THIRD_PARTY_NOTICES.md`, `.github/`, `tools/editor-bundle/`, its own task file; `docs/architecture/api-contract.md` only to promote the PLANNED entry its task implements |
 | frontend-engineer | `templates/`, `static/` (except `static/vendor/`), its own task file; `docs/design/design-system.md` only the section(s) describing tokens or components its task changed |
 | review-engineer | `docs/reviews/<task-id>.md` only (appends one `## Round N` section per review) |
 | qa-engineer | `docs/qa/<task-id>/` (check scripts, screenshots), `tools/qa/` (shared helpers), `assets/screenshots/` (README screenshots, taken from a scratch database with demo data only), the "Manual check results" section and acceptance checkboxes of the task file it was given |

@@ -1,18 +1,24 @@
 {
   "permissions": {
-    "allow": [
+      "allow": [
       "Bash(.venv/Scripts/python.exe -m unittest discover -s tests)",
       "Bash(.venv/Scripts/python.exe -m unittest:*)",
-      "Bash(.venv/Scripts/python.exe -m compileall -q app.py question_bank.py coding_variants.py tests)",
+      "Bash(.venv/Scripts/python.exe -m compileall -q app.py db.py question_bank.py coding_variants.py tests)",
       "Bash(.venv/Scripts/python.exe -m compileall:*)",
+      "Bash(.venv/Scripts/python.exe -m ruff check:*)",
       "Bash(node --check static/app.js)",
       "Bash(node --check static/editor.js)",
       "Bash(.venv/Scripts/python.exe -m tools.qa.qa_browser:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(git -C docs status:*)",
+      "Bash(git -C docs diff:*)",
+      "Bash(git -C docs log:*)",
+      "Bash(git -C docs show:*)"
     ],
+
     "deny": [
       "Edit(instance/**)",
       "Write(instance/**)",
