@@ -115,5 +115,6 @@ Decisions are recorded in `docs/architecture/adr/`. Planned API changes are in `
 | ADR-015 | Move the database code out of `app.py` into `db.py` | Implemented (TASK-051, 2026-10-07) |
 | ADR-016 | Remove the search and source-confirmation step before a question | Accepted (human approval 2026-10-04; changes a guardrail; implemented by TASK-061 and TASK-063; TASK-064 to 066 refine the flow) |
 | ADR-017 | Graded rubric feedback (partial matches, accepted alternatives) and recorded self-assessment | Accepted (no guardrail change; backend implemented by TASK-067, 068, 069, and the rubric fixes by TASK-092; design TASK-070; frontend TASK-075 to 077 not yet done) |
+| ADR-018 | Public code repository, private `docs/` repository | Accepted (human decisions 2026-10-10; no guardrail change; TASK-100 to 103) |
 
 Notes: ADR-008 (2026-10-05) gives the review schedule migration step 5 in `db.py`, replays by `created_at` then `id`, and moves `WEAK_SCORE_THRESHOLD` to `db.py`. ADR-010 (2026-10-05) adds self-assessments to backup format 1. ADR-011 (2026-10-05) keeps history solution-free after ADR-001. ADR-002 and ADR-005 carry 2026-10-04 clarifications (the `[::1]` rationale; the determinism addendum). ADR-001, ADR-007, ADR-009, ADR-011 and ADR-012 carry 2026-10-04 notes pointing to ADR-016.
