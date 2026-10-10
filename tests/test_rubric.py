@@ -1,4 +1,4 @@
-"""ADR-017 / PLANNED-14: rubric states, partial credit and the bank shape check."""
+"""Rubric states, partial credit and the bank shape check."""
 import json
 import os
 import re
@@ -183,10 +183,10 @@ class BankShapeTests(unittest.TestCase):
 
 ALT_PAIRS = "Checks all pairs (brute force)"
 
-# TASK-092: one entry per row of the TASK-069 "Likely-too-strict rubrics" table.
+# Correct answers in other wordings or approaches that the rubric used to miss, one entry per rubric.
 # labels: every criterion label that carries the row (archetype plus hand-written twin);
 # cases: (answer body, expected state, expected alternative label or None);
-# added: every term this task added to that criterion (none may match the prompt).
+# added: every term added to that criterion (none may match the prompt).
 STRICT_RUBRIC_ROWS = {
     1: {
         "labels": ["Uses remainder or parity"],
@@ -456,7 +456,7 @@ def questions_with_label(labels):
 
 
 class StrictRubricFixTests(unittest.TestCase):
-    """TASK-092: correct answers in other wordings or approaches are no longer missed."""
+    """Correct answers in other wordings or approaches are no longer missed."""
 
     def _state(self, question, index, answer):
         starter = question.get("starter_code", "")

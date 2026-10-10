@@ -16,4 +16,4 @@ npm run build
 
 ## Provenance
 
-The vendored bundle contains no version strings. The versions in `package.json` are the best reconstruction from the bundle's commit date (2026-10-03): the newest release of each package published before that date (`codemirror` is the 6.x line; the 5.x releases are a different editor). A rebuild with these versions is not byte-identical to the vendored file: it is 463,833 bytes against 463,394 (439 bytes larger), and it exports the same twelve names. Treat the versions as an approximation, not a record.
+The vendored bundle contains no version strings. The versions in `package.json` are the best reconstruction from the bundle's commit date (2026-10-03): the newest release of each package published before that date (`codemirror` is the 6.x line; the 5.x releases are a different editor). A rebuild with these versions is not byte-identical to the vendored file: it is 463,833 bytes against 463,394 (439 bytes larger), and it exports the same twelve names, though one minified export alias differs (`EditorView` is `A` in the rebuild and `P` in the vendored file). Treat the versions as an approximation, not a record.

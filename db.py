@@ -12,7 +12,7 @@ CANONICAL_QUESTION = (
     "q.id = (SELECT MIN(q2.id) FROM questions q2 WHERE q2.topic = q.topic "
     "AND q2.difficulty = q.difficulty AND q2.mode = q.mode AND q2.prompt = q.prompt)"
 )
-# ADR-005: rows whose identity left QUESTION_BANK are never served or listed.
+# Rows whose identity left QUESTION_BANK are never served or listed.
 # Use this where the table alias is q; queries without an alias inline `retired = 0`.
 ACTIVE_QUESTION = "q.retired = 0"
 _initialized_databases = set()
@@ -30,7 +30,7 @@ def get_db():
         # Seed lazily so `flask run`, WSGI servers, and `python app.py` all work.
         path = current_app.config["DATABASE"]
         if path not in _initialized_databases:
-            # ADR-003: one init per path; mark only after init_db() succeeds.
+            # One init per path; mark only after init_db() succeeds.
             # init_db() calls get_db() again, which returns g.db without the lock.
             with _init_lock:
                 if path not in _initialized_databases:
@@ -100,12 +100,12 @@ def _migration_1_baseline(database):
 
 
 def _migration_2_saved_flag(database):
-    """ADR-004: unsaving keeps the note. Existing rows are saved lessons (default 1)."""
+    """Unsaving keeps the note. Existing rows are saved lessons (default 1)."""
     database.execute("ALTER TABLE saved_lessons ADD COLUMN saved INTEGER NOT NULL DEFAULT 1")
 
 
 def _migration_3_retired_questions(database):
-    """ADR-005: rows whose identity left QUESTION_BANK are retired, not deleted.
+    """Rows whose identity left QUESTION_BANK are retired, not deleted.
 
     Default 0 keeps every existing row active until seeding marks stale ones.
     """
@@ -117,7 +117,7 @@ def _migration_3_retired_questions(database):
 
 
 def _migration_4_rubric_overrides(database):
-    """ADR-017: recorded "I covered this" marks. Never read by scoring or the dashboard."""
+    """Recorded "I covered this" marks. Never read by scoring or the dashboard."""
     database.execute(
         """CREATE TABLE IF NOT EXISTS rubric_overrides (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,7 +135,7 @@ def _migration_4_rubric_overrides(database):
     )
 
 
-# ADR-003: ordered (version, step) pairs. Steps must be additive only (new tables,
+# Ordered (version, step) pairs. Steps must be additive only (new tables,
 # new columns with defaults, new indexes); never rewrite or drop user data.
 MIGRATIONS = [
     (1, _migration_1_baseline),
@@ -146,7 +146,10 @@ MIGRATIONS = [
 
 
 class SchemaTooNewError(RuntimeError):
-    """The database was created by a newer version of Preparator (ADR-014)."""
+    """The database was created by a newer version of Preparator.
+
+    Refuse to open it rather than risk damaging it.
+    """
 
     def __init__(self, database_version, latest_version):
         self.database_version = database_version
@@ -190,7 +193,7 @@ def init_db():
 
 
 def seed_questions(database):
-    # ADR-005: retire everything, then re-activate identities still in the bank.
+    # Retire everything, then re-activate identities still in the bank.
     database.execute("UPDATE questions SET retired = 1")
     for question in QUESTION_BANK:
         identity = (question["topic"], question["difficulty"], question["mode"], question["prompt"])

@@ -26,7 +26,7 @@ ALLOWED_HOSTNAMES = {"127.0.0.1", "localhost"}
 
 @app.before_request
 def guard_localhost_requests():
-    """ADR-002: Host allow-list, same-origin writes, JSON-only POSTs (in that order)."""
+    """Host allow-list, same-origin writes, JSON-only POSTs (in that order)."""
     is_api = request.path.startswith("/api/")
     try:
         hostname = urlparse("//" + request.host).hostname
@@ -59,7 +59,7 @@ API_ERROR_MESSAGES = {
 
 @app.errorhandler(Exception)
 def handle_error(error):
-    """PLANNED-2: every /api/ error is JSON; other routes keep Flask's default pages."""
+    """Every /api/ error is JSON; other routes keep Flask's default pages."""
     is_api = request.path.startswith("/api/")
     if isinstance(error, HTTPException):
         if not is_api:
@@ -116,7 +116,7 @@ PARTIAL_CREDIT = 0.5
 
 
 def evaluate_answer(answer, criteria, starter_code=""):
-    """Heuristic rubric scoring (ADR-017): keywords > alternatives > related > none."""
+    """Heuristic rubric scoring: keywords > alternatives > related > none."""
     if starter_code:
         answer = strip_starter_code(answer, starter_code)
     normalized = re.sub(r"\s+", " ", answer.casefold())
@@ -299,7 +299,7 @@ def theory_library():
         if lesson["unlocked"]:
             lesson["key_points"] = [item["label"] for item in criteria]
         else:
-            # ADR-001: a locked lesson carries no answer content in any response.
+            # A locked lesson carries no answer content in any response.
             lesson["explanation"] = None
             lesson["example"] = None
             lesson["key_points"] = []
@@ -339,7 +339,7 @@ def save_theory_lesson(question_id):
 @app.delete("/api/theory/<int:question_id>")
 def unsave_theory_lesson(question_id):
     database = db.get_db()
-    # ADR-004: keep the note; only clear the flag. Empty notes have nothing to keep.
+    # Keep the note; only clear the flag. Empty notes have nothing to keep.
     database.execute("UPDATE saved_lessons SET saved = 0 WHERE question_id = ?", (question_id,))
     row = database.execute(
         "SELECT note FROM saved_lessons WHERE question_id = ?", (question_id,)

@@ -1,4 +1,4 @@
-"""ADR-005: bank prompts are identity fields, so they must not depend on the hash seed."""
+"""Bank prompts are identity fields, so they must not depend on the hash seed."""
 import os
 import subprocess
 import sys

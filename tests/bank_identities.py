@@ -1,4 +1,4 @@
-"""Baseline of question identities (topic, difficulty, mode, prompt), ADR-005.
+"""Baseline of question identities (topic, difficulty, mode, prompt).
 
 Editing or removing a prompt retires its row and orphans its history, so
 `bank_identities.json` pins every identity. The test only requires the baseline to be a

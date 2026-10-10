@@ -369,7 +369,7 @@ class PreparatorTests(unittest.TestCase):
                 self.assertGreaterEqual(result["score"], 7, result["missing"])
 
     def test_bank_identities_baseline_is_still_present(self):
-        # ADR-005: editing or removing a bank identity retires its row and orphans its history.
+        # Editing or removing a bank identity retires its row and orphans its history.
         # Additions are fine; a deliberate removal means regenerating the baseline in the same commit.
         baseline = {tuple(item) for item in bank_identities.load_baseline()}
         self.assertGreater(len(baseline), 0)
@@ -377,7 +377,7 @@ class PreparatorTests(unittest.TestCase):
         if missing:
             self.fail(
                 f"{len(missing)} baseline identities are missing from QUESTION_BANK (edited or removed prompts "
-                "retire their rows per ADR-005 and orphan history): "
+                "retire their rows and orphan history): "
                 + "; ".join(repr(item) for item in missing[:10])
                 + ". If this is deliberate, regenerate the baseline with "
                 "`.venv/Scripts/python.exe tests/bank_identities.py` and commit it with the change."
@@ -1099,7 +1099,7 @@ class PreparatorTests(unittest.TestCase):
         qid = self._theory_id()
         self.assertEqual(self.client.delete(f"/api/theory/{qid}").get_json(), {"saved": False})
 
-    # ---- TASK-012 / ADR-005: retired rows ----
+    # ---- Retired rows ----
     SEARCH = {  # noqa: RUF012 - read-only constant
         "source_confirmed": True,
         "source_url": "https://www.google.com/search?q=python",
@@ -1298,7 +1298,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertNotIn("Stale prompt", titles)
         self.assertIn("stale note", self.client.get("/api/theory/export.csv").get_data(as_text=True))
 
-    # ---- TASK-068: rubric overrides ----
+    # ---- Rubric overrides ----
     def test_version_3_database_upgrades_to_overrides_table(self):
         path = self._fresh_database_path()
         self._run_init(path)
@@ -1505,7 +1505,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(self.client.post(url, json={"criterion_index": 2}).status_code, 409)
         self.assertEqual(len(self._override_rows()), 1)
 
-    # ---- TASK-010: JSON errors and input validation ----
+    # ---- JSON errors and input validation ----
     def _search(self, **extra):
         return {**self.SEARCH, **extra}
 
@@ -1553,7 +1553,7 @@ class PreparatorTests(unittest.TestCase):
                 response = self.client.post("/api/question", json=self._search(**{field: bad}))
                 self._assert_error(response, 400, "Filters must be text.")
 
-    # ---- TASK-049 / PLANNED-10: previous_score ----
+    # ---- previous_score ----
     def test_previous_score_null_then_last_attempt_score(self):
         qid = self._first_question_id()
         first = self._answer_with_score(qid, 3)
@@ -1563,7 +1563,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertEqual(self._answer_with_score(qid, 5)["previous_score"], 9)
 
     def test_submit_inserts_attempt_before_reading_previous_score(self):
-        # Guards the ordering that makes the previous_score read race-free (TASK-049 NIT 1).
+        # Guards the ordering that makes the previous_score read race-free.
         qid = self._first_question_id()
         statements = []
         real_connect = sqlite3.connect
@@ -1682,7 +1682,7 @@ class PreparatorTests(unittest.TestCase):
         self.assertIn('debug=os.environ.get("FLASK_DEBUG") == "1"', source)
         self.assertNotIn("debug=True", source)
 
-    # ---- TASK-002 review NITs ----
+    # ---- Theory POST body validation ----
     def test_theory_post_non_object_body_gets_generic_message(self):
         qid = self._theory_id()
         self._assert_error(self.client.post(f"/api/theory/{qid}", json=["note"]), 400, self.BODY_MSG)
@@ -1709,7 +1709,7 @@ class PreparatorTests(unittest.TestCase):
         response = self.client.get("/api/theory/export.csv", headers={"Host": "attacker.example"})
         self._assert_error(response, 400, "Unrecognized host.")
 
-    # ---- TASK-018: guardrails, weak spots, lessons, CSV, 404s, selection ----
+    # ---- Guardrails, weak spots, lessons, CSV, 404s, selection ----
     def _question_row(self, mode):
         with preparator.app.app_context():
             return db.get_db().execute(
@@ -1914,7 +1914,7 @@ class PreparatorTests(unittest.TestCase):
 
 
 class LockedLessonTests(unittest.TestCase):
-    """TASK-004 / ADR-001 option A: a Theory lesson's answer content is locked until attempted."""
+    """A Theory lesson's answer content is locked until attempted."""
 
     def setUp(self):
         self.database = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115 - must outlive the with-block
